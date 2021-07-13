@@ -1,3 +1,5 @@
+// For review purposes, will remove before merge.
+
 const core = require('@actions/core');
 const fs = require('fs');
 const path = require('path');

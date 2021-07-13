@@ -1,3 +1,5 @@
+[comment]: <> (For review purposes, will remove before merge.)
+
 # msvc-code-analysis-action
 
 This action enables code analysis to run while building a project with the Microsoft Visual C++ Compiler. The analysis

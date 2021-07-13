@@ -1,3 +1,5 @@
+## For review purposes, will remove before merge.
+
 name: 'MSVC Code Analysis Action'
 description: 'Setup MSVC to produce Code Analysis SARIF files for use in github/codeql-action/upload-sarif@v1'
 inputs:
