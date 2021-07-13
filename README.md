@@ -1,14 +1,84 @@
-# Project
+# msvc-code-analysis-action
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+This action enables code analysis to run while building a project with the Microsoft Visual C++ Compiler. The analysis
+will produce SARIF results that can be uploaded to the GitHub Code Scanning Alerts experience.
 
-As the maintainer of this project, please make a few updates:
+## Usage
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+### Pre-requisites
+
+Include a workflow `.yml` file using an [example](#example) below as a template. Run the `msvc-code-analysis-action`
+before re-building your project using the appropriate operation mode detailed below.
+
+### Inputs
+- `mode` (**default:** General) operation mode given different environments and build systems:
+   - **General:** enable Code Analysis for any build system. The MSVC compiler with the desired host and target
+   architecture must be available on the PATH. 
+   - **MSBuild:** enable MSBuild Code Analysis experience. This is the preferred method if using MSBuild projects as it
+   can use Code Analysis settings as configured in Visual Studio.
+- `results` (**default:** ${{ github.workspace }}) root directory containing all SARIF files produced in build.
+This is commonly the root directory of the project (i.e. MSBuild) or build folder (i.e. CMake).
+- `ruleset` (**default:** NativeRecommendedRules.ruleset) ruleset file used to determine what checks are run. This can
+reference a ruleset that ship with Visual Studio or a custom file in the project.
+- `cleanSarif` (**default:** true) SARIF files will under `results` directory are considered stale and will be deleted.
+- `args` optional parameters to pass to every instance of the compiler.
+
+### Examples
+
+#### CMake
+
+```yml
+  # Use VCPKG to make MSVC discoverable on the PATH
+- name: Add MSVC to the PATH
+  uses: lukka/run-vcpkg@v7
+  with:
+    setupOnly: true
+
+  # Configure MSVC to run code analysis during build
+- name: Initialize MSVC Code Analysis 
+  uses: microsoft/msvc-code-analysis-action
+  with:
+    # Path to directory that will contain produced sarif files
+    results: build
+    # Ruleset file that will determine what checks will be run
+    ruleset: NativeRecommendRules.ruleset
+
+  # Rebuild the project using any MSVC compatible build system
+- name: Build Project
+  run: cmake -G Ninja -B build --clean-first
+
+  # Upload all SARIF files generated in the build directory tree
+- name: Upload SARIF files
+  uses: github/codeql-action/upload-sarif@v1
+  with:
+    sarif_file: build
+```
+
+#### MSBuild
+
+```yml
+  # Make MSBuild discoverable on the PATH
+- name: Add MSBuild to PATH
+  uses: microsoft/setup-msbuild@v1.0.2
+
+  # Configure MSVC to run code analysis during build
+- name: Initialize MSVC Code Analysis 
+  uses: microsoft/msvc-code-analysis-action@v1
+  with:
+    # Root of MSBuild Solution containing all project directories
+    result: ${{ github.workspace }}
+
+  # Rebuild the project using MSBuild
+- name: Build Project
+  run: msbuild Project.sln /p:Configuration=Release /p:Platform=x64 /t:rebuild
+
+  # Upload all SARIF files generated in the build directory tree
+- name: Upload SARIF files
+  uses: github/codeql-action/upload-sarif@v1
+  with:
+    # Root of MSBuild Solution containing all project directories
+    sarif_file: ${{ github.workspace }}
+```
 
 ## Contributing
 
