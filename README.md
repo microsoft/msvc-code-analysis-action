@@ -1,5 +1,3 @@
-[comment]: <> (For review purposes, will remove before merge.)
-
 # msvc-code-analysis-action
 
 This action enables code analysis to run while building a project with the Microsoft Visual C++ Compiler. The analysis
@@ -21,8 +19,8 @@ before re-building your project using the appropriate operation mode detailed be
 - `results` (**default:** ${{ github.workspace }}) root directory containing all SARIF files produced in build.
 This is commonly the root directory of the project (i.e. MSBuild) or build folder (i.e. CMake).
 - `ruleset` (**default:** NativeRecommendedRules.ruleset) ruleset file used to determine what checks are run. This can
-reference a ruleset that ship with Visual Studio or a custom file in the project.
-- `cleanSarif` (**default:** true) SARIF files will under `results` directory are considered stale and will be deleted.
+reference a ruleset that ships with Visual Studio or a custom file in the project.
+- `cleanSarif` (**default:** true) SARIF files will under `results` directory are considered stale and be deleted.
 - `args` optional parameters to pass to every instance of the compiler.
 
 ### Examples

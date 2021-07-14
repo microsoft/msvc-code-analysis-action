@@ -1,9 +1,7 @@
-// For review purposes, will remove before merge.
-
-const core = require('@actions/core');
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+import { getInput, warning, exportVariable, setFailed } from '@actions/core';
+import { existsSync, readdirSync, unlinkSync } from 'fs';
+import { join, isAbsolute, extname, dirname, basename, normalize } from 'path';
+import { format } from 'util';
 
 const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Analysis Tools\\Rule Sets';
 const DefaultRulesetName = 'NativeRecommendedRules.ruleset';
@@ -32,8 +30,8 @@ function addArg(clArgs, arg) {
 function findExecutableOnPath(executable) {
   var paths = process.cwd() + ';' + process.env.PATH;
   for (const pathDir of paths.split(';')) {
-    const executablePath = path.join(pathDir, executable);
-    if (fs.existsSync(executablePath)) {
+    const executablePath = join(pathDir, executable);
+    if (existsSync(executablePath)) {
       return executablePath;
     }
   }
@@ -43,29 +41,29 @@ function findExecutableOnPath(executable) {
 
 // Ensure results directory for SARIF files exists and delete stale files if needed.
 function prepareResultsDir() {
-  var outputDir = core.getInput('results');
+  var outputDir = getInput('results');
   if (outputDir == '') {
     throw new Error('`results` must exist and contain all intermediate build directories.');
   }
 
   // make relative path relative to the repo root
-  if (!path.isAbsolute(outputDir)) {
-    outputDir = path.join(process.env.GITHUB_WORKSPACE, outputDir);
+  if (!isAbsolute(outputDir)) {
+    outputDir = join(process.env.GITHUB_WORKSPACE, outputDir);
   }
 
-  if (!fs.existsSync(outputDir)) {
+  if (!existsSync(outputDir)) {
     throw new Error('`results` must exist and contain all intermediate build directories.');
   }
 
-  var cleanSarif = core.getInput('cleanSarif');
+  var cleanSarif = getInput('cleanSarif');
   switch (cleanSarif.toLowerCase()) {
     case 'true':
     {
       // delete existing Sarif files that are consider stale
-      files = fs.readdirSync(outputDir, { withFileTypes: true });
+      files = readdirSync(outputDir, { withFileTypes: true });
       files.forEach(file => {
-        if (file.isFile() && path.extname(file.name).toLowerCase() == '.sarif') {
-          fs.unlinkSync(path.join(outputDir, file.name));
+        if (file.isFile() && extname(file.name).toLowerCase() == '.sarif') {
+          unlinkSync(join(outputDir, file.name));
         }
       });
       break;
@@ -81,17 +79,17 @@ function prepareResultsDir() {
 
 // EspXEngine.dll only exists in host/target bin for MSVC Visual Studio release.
 function findEspXEngine(clPath) {
-  const clDir = path.dirname(clPath);
+  const clDir = dirname(clPath);
 
   // check if we already have the correct host/target pair
-  var dllPath = path.join(clDir, 'EspXEngine.dll');
-  if (fs.existsSync(dllPath)) {
+  var dllPath = join(clDir, 'EspXEngine.dll');
+  if (existsSync(dllPath)) {
     return dllPath;
   }
 
   var targetName = '';
-  var hostDir = path.dirname(clDir);
-  switch (path.basename(hostDir)) {
+  var hostDir = dirname(clDir);
+  switch (basename(hostDir)) {
     case 'HostX86':
       targetName = 'x86';
       break;
@@ -102,8 +100,8 @@ function findEspXEngine(clPath) {
       throw new Error('Unknown MSVC toolset layout');
   }
 
-  dllPath = path.join(hostDir, targetName, 'EspXEngine.dll');
-  if (fs.existsSync(dllPath)) {
+  dllPath = join(hostDir, targetName, 'EspXEngine.dll');
+  if (existsSync(dllPath)) {
     return dllPath;
   }
 
@@ -112,34 +110,34 @@ function findEspXEngine(clPath) {
 
 // Find official ruleset directory using the known path of MSVC compiler in Visual Studio.
 function findRulesetDirectory(clPath) {
-  const rulesetDirectory = path.normalize(path.join(path.dirname(clPath), RelativeRulesetPath));
-  return fs.existsSync(rulesetDirectory) ? rulesetDirectory : undefined;
+  const rulesetDirectory = normalize(join(dirname(clPath), RelativeRulesetPath));
+  return existsSync(rulesetDirectory) ? rulesetDirectory : undefined;
 }
 
 function findRuleset(rulesetDirectory) {
-  var rulesetPath = core.getInput('ruleset');
+  var rulesetPath = getInput('ruleset');
   if (rulesetPath == '') {
     return undefined;
   }
 
-  if (path.isAbsolute(rulesetPath)) {
-    return fs.existsSync(rulesetPath) ? rulesetPath : undefined;
+  if (isAbsolute(rulesetPath)) {
+    return existsSync(rulesetPath) ? rulesetPath : undefined;
   }
 
   // search for a path relative to the project directory
-  const repoRulesetPath = path.join(process.env.GITHUB_WORKSPACE, rulesetPath);
-  if (fs.existsSync(repoRulesetPath)) {
+  const repoRulesetPath = join(process.env.GITHUB_WORKSPACE, rulesetPath);
+  if (existsSync(repoRulesetPath)) {
     return repoRulesetPath;
   }
 
   // search official ruleset directory that ships inside of Visual Studio
   if (rulesetDirectory != undefined) {
-    const officialRulesetPath = path.join(rulesetDirectory, rulesetPath);
-    if (fs.existsSync(officialRulesetPath)) {
+    const officialRulesetPath = join(rulesetDirectory, rulesetPath);
+    if (existsSync(officialRulesetPath)) {
       return officialRulesetPath;
     }
   } else {
-    core.warning('Unable to find official rulesets shipped with Visual Studio');
+    warning('Unable to find official rulesets shipped with Visual Studio');
   }
 
   throw new Error('Unable to fine ruleset specified: ' + rulesetPath);
@@ -156,7 +154,7 @@ function configureGeneralProject() {
   // fine cl.exe on the corresponding EspXEngine.dll
   const clPath = findExecutableOnPath('cl.exe');
   const espXEngine = findEspXEngine(clPath);
-  addArg(clArgs, util.format('/analyze:plugin%s', espXEngine));
+  addArg(clArgs, format('/analyze:plugin%s', espXEngine));
 
   // find ruleset directory that ships inside of Visual Studio
   const rulesetDirectory = findRulesetDirectory(clPath);
@@ -164,51 +162,51 @@ function configureGeneralProject() {
   // find ruleset if specified
   const rulesetPath = findRuleset(rulesetDirectory);
   if (rulesetPath != undefined) {
-    addArg(clArgs, util.format('/analyze:ruleset%s', rulesetPath));
+    addArg(clArgs, format('/analyze:ruleset%s', rulesetPath));
 
     // add ruleset directories incase user includes any official rulesets
     if (rulesetDirectory != undefined) {
-      addArg(clArgs, util.format('/analyze:rulesetdirectory%s', rulesetDirectory));
+      addArg(clArgs, format('/analyze:rulesetdirectory%s', rulesetDirectory));
     }
   }
 
   // add additional command-line arguments to MSVC if specified
-  const additionalArgs =  core.getInput('args');
+  const additionalArgs =  getInput('args');
   if (additionalArgs != '') {
     clArgs.push(additionalArgs);
   }
 
   // add analysis arguments to _CL_ env variable
-  core.exportVariable('_CL_', clArgs.join(' '));
+  exportVariable('_CL_', clArgs.join(' '));
 
   // enable compatibility mode as GitHub does not support some sarif options
-  core.exportVariable('CAEmitSarifLog', '1');
+  exportVariable('CAEmitSarifLog', '1');
 }
 
 // Configuration if (mode == MSBuild).
 function configureMSBuildProject() {
 
   // ensure ruleset is empty or not modified from default
-  var rulesetPath = core.getInput('ruleset');
+  var rulesetPath = getInput('ruleset');
   if (rulesetPath != '' || rulesetPath != DefaultRulesetName) {
     throw new Error(
       'Custom ruleset not support in MSBuild mode. Configure ruleset in project or use /p:CodeAnalysisRuleset=XXX');
   }
 
   // add additional command-line arguments to MSVC if specified
-  const additionalArgs =  core.getInput('args');
+  const additionalArgs =  getInput('args');
   if (additionalArgs != '') {
-    core.exportVariable('_CL_', additionalArgs);
+    exportVariable('_CL_', additionalArgs);
   }
-
+  
   // force Code Analysis to run
-  core.exportVariable('RunCodeAnalysis', 'true');
+  exportVariable('RunCodeAnalysis', 'true');
 
   // extra redundancy in case the user has RunCodeAnalysis manually configured in project
-  core.exportVariable('RunCodeAnalysisOnce', 'true');
+  exportVariable('RunCodeAnalysisOnce', 'true');
 
   // force generation of Sarif output that us only used in the IDE experience
-  core.exportVariable('VCCodeAnalysisUX', 'true');
+  exportVariable('VCCodeAnalysisUX', 'true');
 }
 
 //
@@ -216,7 +214,7 @@ function configureMSBuildProject() {
 //
 
 try { 
-  const mode = core.getInput('mode');
+  const mode = getInput('mode');
   switch (mode.toLowerCase()) {
     case 'general':
       configureGeneralProject()
@@ -231,5 +229,5 @@ try {
   prepareResultsDir();
 
 } catch (error) {
-  core.setFailed(error.message);
+  setFailed(error.message);
 }
