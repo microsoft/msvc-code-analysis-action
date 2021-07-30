@@ -1,0 +1,22 @@
+name: 'MSVC Code Analysis Action'
+description: 'Setup MSVC to produce Code Analysis SARIF files for use in github/codeql-action/upload-sarif@v1'
+inputs:
+  mode:
+    description: 'Operation mode given different environments and build systems.'
+    default: 'General'
+  results:
+    description: 'root directory containing all SARIF files produced in build.'
+    default: '${{ github.workspace }}'
+  ruleset:
+    description: 'Ruleset file to use during analysis.'
+    default: 'NativeRecommendedRules.ruleset'
+  cleanSarif:
+    description: 'SARIF files will under `results` directory are considered stale and will be deleted.'
+    default: 'True'
+  args:
+    description: 'Optional parameters to pass to every instance of the compiler.'
+    required: false
+
+runs:
+  using: 'node12'
+  main: 'index.js'
