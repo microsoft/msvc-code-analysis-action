@@ -43,35 +43,32 @@ function findExecutableOnPath(executable) {
 function prepareResultsDir() {
   var outputDir = core.getInput('results');
   if (outputDir == '') {
-    throw new Error('`results` must exist and contain all intermediate build directories.');
-  }
-
-  // make relative path relative to the repo root
-  if (!path.isAbsolute(outputDir)) {
+    // set path to repo root if not specified
+    outputDir = process.env.GITHUB_WORKSPACE;
+  } else if (!path.isAbsolute(outputDir)) {
+    // make path relative to the repo root if not absolute
     outputDir = path.join(process.env.GITHUB_WORKSPACE, outputDir);
   }
 
-  if (!fs.existsSync(outputDir)) {
-    throw new Error('`results` must exist and contain all intermediate build directories.');
-  }
-
-  var cleanSarif = core.getInput('cleanSarif');
-  switch (cleanSarif.toLowerCase()) {
-    case 'true':
-    {
-      // delete existing Sarif files that are consider stale
-      files = fs.readdirSync(outputDir, { withFileTypes: true });
-      files.forEach(file => {
-        if (file.isFile() && path.extname(file.name).toLowerCase() == '.sarif') {
-          fs.unlinkSync(path.join(outputDir, file.name));
-        }
-      });
-      break;
+  if (existsSync(outputDir)) {
+    var cleanSarif = core.getInput('cleanSarif');
+    switch (cleanSarif.toLowerCase()) {
+      case 'true':
+      {
+        // delete existing Sarif files that are consider stale
+        files = fs.readdirSync(outputDir, { withFileTypes: true });
+        files.forEach(file => {
+          if (file.isFile() && path.extname(file.name).toLowerCase() == '.sarif') {
+            fs.unlinkSync(path.join(outputDir, file.name));
+          }
+        });
+        break;
+      }
+      case 'false':
+        break;
+      default:
+        throw new Error('Unsupported value for \'cleanSarif\'. Must be either \'True\' or \'False\'');
     }
-    case 'false':
-      break;
-    default:
-      throw new Error('Unsupported value for \'cleanSarif\'. Must be either \'True\' or \'False\'');
   }
 
   return outputDir;
