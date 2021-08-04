@@ -50,7 +50,7 @@ function prepareResultsDir() {
     outputDir = path.join(process.env.GITHUB_WORKSPACE, outputDir);
   }
 
-  if (existsSync(outputDir)) {
+  if (path.existsSync(outputDir)) {
     var cleanSarif = core.getInput('cleanSarif');
     switch (cleanSarif.toLowerCase()) {
       case 'true':
