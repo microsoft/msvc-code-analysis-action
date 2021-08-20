@@ -1,0 +1,55 @@
+name: 'run-tests'
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 2 * * SUN'
+
+jobs:
+  build_and_test:
+    name: build and unit tests
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout action
+      uses: actions/checkout@v2.3.4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v2.4.0
+      with:
+        node-version: '12.x'
+    - name: Build and test
+      run: 
+        npm install |
+        npm test
+
+  functional_test:
+    name: run functional tests
+    runs-on: windows-latest
+
+    env:
+      sample: '${{ github.workspace }}/test/sample'
+      build: '${{ env.sample: }}/build'
+      results: '${{ env.build: }}/results'
+
+    steps:
+    - name: Checkout action
+      uses: actions/checkout@v2.3.4
+
+    - name: Initialize sample CMake Project
+      uses: lukka/run-vcpkg@v6
+      with:
+        cmakeListsTxtPath: ${{ env.sample }}
+        buildDirectory: ${{ env.build }}
+        cmakeGenerator: VS16Win64
+        buildWithCMake: false
+      
+    - name: Run action
+      uses: ./
+      with:
+        cmakeBuildDirectory: ${{ env.build }}
+        resultsDirectory: ${{ env.results }}
+        ignoreSystemHeaders: true
+
+    # TODO: Validate SARIF produced

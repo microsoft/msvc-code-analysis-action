@@ -3,7 +3,7 @@ description: 'Run Microsoft C++ Code Analysis to produce SARIF files for use in 
 inputs:
   cmakeBuildDirectory:
     description: 'The CMake build directory that should already be generated.'
-    default: 'General'
+    required: true
   resultsDirectory:
     description: 'The directory in which the individual SARIF files produced by analysis will be located.'
     default: '${{ github.workspace }}/results'
@@ -12,10 +12,10 @@ inputs:
     default: 'NativeRecommendedRules.ruleset'
   ignoreSystemHeaders:
     description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
-    default: 'True'
+    default: true
   cleanSarif:
     description: 'SARIF files will under `results` directory are considered stale and will be deleted.'
-    default: 'True'
+    default: true
   args:
     description: 'Optional parameters to pass to every instance of the compiler.'
     required: false
