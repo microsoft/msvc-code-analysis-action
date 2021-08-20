@@ -1,9 +1,12 @@
 "use strict";
 
-const td = require("testdouble");
+const chai = require("chai");
 const path = require("path");
 const rewire = require("rewire");
-const assert = require("assert");
+const td = require("testdouble");
+
+const expect = chai.expect;
+chai.should();
 
 const cmakeExePath = path.normalize("C:\\path\\to\\cmake.exe");
 const cmakeBuildDir = path.normalize("path\\to\\cmake\\build");
@@ -13,15 +16,15 @@ const cmakeApiDir = path.join(cmakeBuildDir, path.normalize(".cmake\\api\\v1"));
 const cmakeQueryDir = path.join(cmakeApiDir, "query");
 const cmakeReplyDir = path.join(cmakeApiDir, "reply");
 
+const clPath = "C:/VS/root/Tools/MSVC/14.29.30133/bin/Hostx86/x86/cl.exe";
+const clInclude = "C:/VS/root/Tools/MSVC/14.29.30133/include";
+
 const cmakeIndexReply = path.join(cmakeReplyDir, "index-1.json");
-const cmakeCodemodelReply = path.join(cmakeReplyDir, "codemodel-1.json");
 const cmakeCacheReply = path.join(cmakeReplyDir, "cache-1.json");
+const cmakeCodemodelReply = path.join(cmakeReplyDir, "codemodel-1.json");
 const cmakeToolchainsReply = path.join(cmakeReplyDir, "toolchains-1.json");
 const cmakeTarget1Reply = path.join(cmakeReplyDir, "target-1.json");
 const cmakeTarget2Reply = path.join(cmakeReplyDir, "target-2.json");
-
-const clPath = "C:/VS/root/Tools/MSVC/14.29.30133/bin/Hostx86/x86/cl.exe";
-const clInclude = "C:/VS/root/Tools/MSVC/14.29.30133/include";
 
 let defaultFileContents = {};
 defaultFileContents[cmakeIndexReply] = {
@@ -123,33 +126,36 @@ defaultFileContents[cmakeToolchainsReply] = {
     ]
 };
 
+const sharedArgs = "/a /b /c";
+const uniqueArgs = "/e /f";
+const totalCompileCommands = 4;
 defaultFileContents[cmakeTarget1Reply] = {
     "compileGroups": [
         {
-            "compilCommandFragments": [
-                { "fragment": "/a /b /c" },
-                { "fragment": "/e /f" }
+            "compileCommandFragments": [
+                { "fragment": sharedArgs },
+                { "fragment": uniqueArgs }
             ],
             "includes": [
                 { "path": "regular/include"},
-                { "path": "external/include" }
+                { "path": "external/include", "isSystem": true }
             ],
             "language": "CXX",
-            "sourceIndex": [
+            "sourceIndexes": [
                 0,
                 2
             ]
         },
         {
-            "compilCommandFragments": [
-                { "fragment": "/e /f" }
+            "compileCommandFragments": [
+                { "fragment": sharedArgs }
             ],
             "includes": [
-                { "path": "regular/include" },
-                { "path": "external/include" }
+                { "path": "regular/include", "isSystem": false },
+                { "path": "external/include", "isSystem": true }
             ],
             "language": "C",
-            "sourceIndex": [
+            "sourceIndexes": [
                 1
             ]
         },
@@ -164,41 +170,77 @@ defaultFileContents[cmakeTarget1Reply] = {
 defaultFileContents[cmakeTarget2Reply] = {
     "compileGroups": [
         {
-            "compilCommandFragments": [
-                { "fragment": "/g /h" }
+            "compileCommandFragments": [
+                { "fragment": sharedArgs }
+            ],
+            "includes": [
+                { "path": "regular/include" },
+                { "path": "external/include", "isSystem": true }
             ],
             "defines": [
                 { "define": "a=b"},
                 { "define": "c=d"},
             ],
             "language": "CXX",
-            "sourceIndex": [
-                1
+            "sourceIndexes": [
+                0
             ]
         },
     ],
     "sources": [
-        { "path" : "src/file2.c"},
+        { "path" : "src/file4.cpp"},
     ]
 };
-
-function setFileContents(fsModule, filepath) {
-    td.when(fsModule.existsSync(filepath)).thenReturn(true);
-    td.when(fsModule.readFileSync(filepath, td.matchers.anything())).thenReturn(
-        JSON.stringify(defaultFileContents[filepath]));
-}
-
-function editFileContents(fsModule, filepath, editCallback) {
-    let contents = JSON.parse(JSON.stringify(defaultFileContents[filepath]));
-    editCallback(contents);
-    td.when(fsModule.readFileSync(filepath, td.matchers.anything())).thenReturn(JSON.stringify(contents));
-}
 
 describe("CMakeApi", () => {
     let child_process;
     let fs;
     let action;
     let api;
+    let options;
+
+    function setFileContents(filepath) {
+        td.when(fs.existsSync(filepath)).thenReturn(true);
+        td.when(fs.readFileSync(filepath, td.matchers.anything())).thenReturn(
+            JSON.stringify(defaultFileContents[filepath]));
+    }
+
+    function editFileContents(filepath, editCallback) {
+        let contents = JSON.parse(JSON.stringify(defaultFileContents[filepath]));
+        editCallback(contents);
+        td.when(fs.readFileSync(filepath, td.matchers.anything())).thenReturn(JSON.stringify(contents));
+    }
+ 
+    function validateCompileCommands() {
+        let compileCommands = [...api.compileCommandsIterator(options)];
+        for (let compileCommand of compileCommands) {
+            let args = compileCommand.args;
+
+            args.should.contain(sharedArgs);
+            args.should.contain('"/Iregular/include"');
+            if (options.ignoreSystemHeaders) {
+                args.should.contain('"/external:Iexternal/include"');
+            } else {
+                args.should.contain('"/Iexternal/include"');
+            }
+
+            switch (path.basename(compileCommand.source)) {
+                case "file1.cpp":
+                case "file3.cxx":
+                    args.should.contain(uniqueArgs);
+                    break;
+                case "file2.c":
+                    break;
+                case "file4.cpp":
+                    args.should.contain('"/Da=b" "/Dc=d"');
+                    break;
+                default:
+                    assert.fail("Unknown source file: " + compileCommand.source);
+            }
+        }
+
+        return compileCommands;
+    }
 
     beforeEach(() => {
         // modules
@@ -206,6 +248,10 @@ describe("CMakeApi", () => {
         fs = td.replace("fs");
         action = rewire("../index.js");
         api = new (action.__get__("CMakeApi"))();
+
+        // default compiler options
+        options = new (action.__get__("CompilerCommandOptions"));
+        options.ignoreSystemHeaders = false;
 
         // default cmake folders
         td.when(fs.existsSync(cmakeBuildDir)).thenReturn(true);
@@ -222,7 +268,7 @@ describe("CMakeApi", () => {
         // default reply files
         td.when(fs.readdirSync(cmakeReplyDir)).thenReturn(Object.keys(defaultFileContents));
         for (const file of Object.keys(defaultFileContents)) {
-            setFileContents(fs, file);
+            setFileContents(file);
         }
     });
 
@@ -230,62 +276,88 @@ describe("CMakeApi", () => {
         td.reset();
     });
 
+    // Common tests.
 
-    // only testing user errors, assume format of query/reply files is valid
-    describe("errors", () => {
-        it("empty buildRoot", () => {
-            assert.throws(() => api.loadApi(""), { message:
-                "CMakeApi: 'buildRoot' can not be null or empty."});
+    let basicTests = function () {
+        it("get compile commands", () => {
+            api.loadApi(cmakeBuildDir);
+            let commands = validateCompileCommands();
+            commands.length.should.equal(totalCompileCommands);
         });
+    };
 
-        it("buildRoot does not exist", () => {
-            td.when(fs.existsSync(cmakeBuildDir)).thenReturn(false);
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                "Generated build root for CMake not found at: " + cmakeBuildDir});
-        });
-        
-        it("cmake not run (missing .cmake/api dir)", () => {
-            td.when(fs.existsSync(cmakeApiDir)).thenReturn(false);
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                ".cmake/api/v1 missing, run CMake config before using action." });
-        });
-
-        it("cmake version < 3.13.7", () => {
-            editFileContents(fs, cmakeIndexReply, (reply) => {
-                reply.version.string = "3.13.6";
+    let msvcNotUsedTests = function() {
+        beforeEach(() => {
+            editFileContents(cmakeCacheReply, (reply) => {
+                reply.entries[CLangIndex].value = "clang.exe";
+                reply.entries[CXXLangIndex].value = "clang.exe";
             });
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                "Action requires CMake version >= 3.13.7" });
-        });
-
-        it("cmake exe does not exist", () => {
-            td.when(fs.existsSync(cmakeExePath)).thenReturn(false);
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                "Unable to find CMake used to build project at: " + cmakeExePath});
-        });
-
-        it("cmake.exe failed to run", () => {
-            td.when(child_process.spawn(td.matchers.anything(), td.matchers.anything()))
-                .thenCallback(new Error(".exe failed"));
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                "Unable to run CMake used previously to build cmake project." });
-        });
-
-        it("msvc for neither C/C++", () => {
-            editFileContents(fs, cmakeToolchainsReply, (reply) => {
+            editFileContents(cmakeToolchainsReply, (reply) => {
                 reply.toolchains[CLangIndex].compiler.path = "clang.exe";
                 reply.toolchains[CLangIndex].compiler.id = "Clang";
                 reply.toolchains[CXXLangIndex].compiler.path = "clang.exe";
                 reply.toolchains[CXXLangIndex].compiler.id = "Clang";
             });
-            assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                "Action requires use of MSVC for either/both C or C++." });
         });
+
+        it("msvc for neither C/C++", () => {
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw(
+                "Action requires use of MSVC for either/both C or C++.");
+        });
+    }
+
+    basicTests();
+
+    // only testing user errors, assume format of query/reply files is valid
+    describe("errors", () => {
+        it("empty buildRoot", () => {
+            expect(() => api.loadApi("")).to.throw("CMakeApi: 'buildRoot' can not be null or empty.");
+        });
+
+        it("buildRoot does not exist", () => {
+            td.when(fs.existsSync(cmakeBuildDir)).thenReturn(false);
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw("Generated build root for CMake not found at: ");
+        });
+        
+        it("cmake not run (missing .cmake/api dir)", () => {
+            td.when(fs.existsSync(cmakeApiDir)).thenReturn(false);
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw(
+                ".cmake/api/v1 missing, run CMake config before using action.");
+        });
+
+        it("cmake version < 3.13.7", () => {
+            editFileContents(cmakeIndexReply, (reply) => {
+                reply.version.string = "3.13.6";
+            });
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw("Action requires CMake version >= 3.13.7" );
+        });
+
+        it("cmake exe does not exist", () => {
+            td.when(fs.existsSync(cmakeExePath)).thenReturn(false);
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw("Unable to find CMake used to build project at: ");
+        });
+
+        it("cmake.exe failed to run", () => {
+            td.when(child_process.spawn(td.matchers.anything(), td.matchers.anything()))
+                .thenCallback(new Error(".exe failed"));
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw(
+                "Unable to run CMake used previously to build cmake project.");
+        });
+
+        msvcNotUsedTests();
+    });
+
+    describe("ignore system headers", () => {
+        beforeEach(() => {
+            options.ignoreSystemHeaders = true;
+        });
+
+        basicTests();
     });
 
     describe("no toolchains", () => {
         beforeEach(() => {
-            editFileContents(fs, cmakeIndexReply, (reply) => {
+            editFileContents(cmakeIndexReply, (reply) => {
                 reply.version.string = "3.13.7";
                 reply.reply["client-msvc-ca-action"]["query.json"].responses = [
                     { "kind" : "cache", "jsonFile" : path.basename(cmakeCacheReply) },
@@ -294,15 +366,10 @@ describe("CMakeApi", () => {
             });
         });
 
+        basicTests();
+
         describe("errors", () => {
-            it("msvc for neither C/C++", () => {
-                editFileContents(fs, cmakeCacheReply, (reply) => {
-                    reply.entries[CLangIndex].value = "clang.exe";
-                    reply.entries[CXXLangIndex].value = "clang.exe";
-                });
-                assert.throws(() => api.loadApi(cmakeBuildDir), { message:
-                    "Action requires use of MSVC for either/both C or C++." });
-            });
+            msvcNotUsedTests();
         });
     });
 });
