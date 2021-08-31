@@ -567,7 +567,7 @@ const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Anal
  */
 function escapeArgument(arg) {
   // find number of consecutive trailing backslashes
-  var i = 0;
+  let i = 0;
   while (i < arg.length && arg[arg.length - 1 - i] == '\\') {
     i++;
   }
@@ -586,8 +586,8 @@ function escapeArgument(arg) {
  * @param {*} path path to the MSVC compiler
  * @returns the MSVC toolset version number
  */
-function extractVersionFromCompilerPath(path) {
-  versionDir = path.join(path, "../../..");
+function extractVersionFromCompilerPath(compilerPath) {
+  let versionDir = path.join(compilerPath, "../../..");
   return path.basename(versionDir);
 }
 
@@ -596,8 +596,8 @@ function extractVersionFromCompilerPath(path) {
  * @param {*} path path to the MSVC compiler
  * @returns array of default includes used by the given MSVC toolset
  */
-function extractIncludesFromCompilerPath(path) {
-  includeDir = path.join(path, "../../../include");
+function extractIncludesFromCompilerPath(compilerPath) {
+  let includeDir = path.join(compilerPath, "../../../include");
   // TODO: extract includes from Windows SDK tied to the given toolset.
   return [ path.normalize(includeDir) ];
 }
@@ -610,8 +610,7 @@ function extractIncludesFromCompilerPath(path) {
  * @returns the absolute path to the input path if specified.
  */
 function resolveInputPath(input, required = false) {
-  var inputPath = core.getInput(input);
-
+  let inputPath = core.getInput(input);
   if (!inputPath) {
     if (required) {
       throw new Error(input + " input path can not be empty.");
@@ -624,6 +623,26 @@ function resolveInputPath(input, required = false) {
   }
 
   return inputPath;
+}
+
+/**
+ * Helper for iterating over object properties that may not exist
+ * @param {*} object object with given optional property
+ * @param {*} property property name
+ * @returns iterable if exists, otherwise empty array.
+ */
+function iterateIfExists(object, property) {
+  return object && object.hasOwnProperty(property) ? object[property] : [];
+}
+
+/**
+ * Options to enable/disable different compiler features.
+ */
+function CompilerCommandOptions() {
+  // Use /external command line options to ignore warnings in CMake SYSTEM headers.
+  this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
+  // TODO: add support to build precompiled headers before running analysis.
+  this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
 }
 
 /**
@@ -731,7 +750,7 @@ class CMakeApi {
     const data = this._parseReplyFile(cacheJsonFile);
 
     // ignore entry type and just store name and string-value pair.
-    for (const entry of data.entries) {
+    for (const entry of iterateIfExists(data, 'entries')) {
       this.cache[entry.name] = entry.value;
     }
   }
@@ -745,7 +764,7 @@ class CMakeApi {
     const data = this._parseReplyFile(codemodelJsonFile);
 
     // TODO: let the user decide which configuration in multi-config generators
-    for (const target of data.configurations[0].targets) {
+    for (const target of iterateIfExists(data.configurations[0], 'targets')) {
       this.targetFilepaths.push(path.join(replyDir, target.jsonFile));
     }
 
@@ -759,7 +778,7 @@ class CMakeApi {
   _loadToolchains(toolsetJsonFile) {
     const data = this._parseReplyFile(toolsetJsonFile);
 
-    for (const toolchain of data.toolchains) {
+    for (const toolchain of iterateIfExists(data, 'toolchains')) {
       let compiler = toolchain.compiler;
       if (toolchain.language == "C" && compiler.id == "MSVC") {
         this.cCompilerInfo = {
@@ -787,7 +806,7 @@ class CMakeApi {
    */
   _loadToolchainsFromCache() {
     let cPath = this.cache["CMAKE_C_COMPILER"];
-    if (cPath.endsWith("cl.exe") && cPath.endsWith("cl")) {
+    if (cPath.endsWith("cl.exe") || cPath.endsWith("cl")) {
       this.cCompilerInfo = {
         path: cPath,
         version: extractVersionFromCompilerPath(cPath),
@@ -796,7 +815,7 @@ class CMakeApi {
     }
 
     let cxxPath = this.cache["CMAKE_CXX_COMPILER"];
-    if (cxxPath.endsWith("cl.exe") && cxxPath.endsWith("cl")) {
+    if (cxxPath.endsWith("cl.exe") || cxxPath.endsWith("cl")) {
       this.cxxCompilerInfo = {
         path: cxxPath,
         version: extractVersionFromCompilerPath(cxxPath),
@@ -819,7 +838,8 @@ class CMakeApi {
     let toolchainLoaded = false;
     const replyDir = path.join(apiDir, "reply");
     const indexReply = this._getApiReplyIndex(apiDir);
-    for (const response of indexReply.reply[CMakeApi.clientName]["query.json"].responses) {
+    const clientReplies = indexReply.reply[CMakeApi.clientName];
+    for (const response of iterateIfExists(clientReplies["query.json"], 'responses')) {
       switch (response["kind"]) {
         case "cache":
           cacheLoaded = true;
@@ -859,27 +879,29 @@ class CMakeApi {
    */
   _getCompileGroupArguments(group, options)
   {
-    compileArguments = [];
-    for (const command of group.compileCommandFragments) {
+    let compileArguments = [];
+    for (const command of iterateIfExists(group, 'compileCommandFragments')) {
       compileArguments.push(command.fragment);
     }
 
-    for (const include of group.includes) {
-      if (options.useExternalIncludes) {
+    for (const include of iterateIfExists(group, 'includes')) {
+      if (options.ignoreSystemHeaders && include.isSystem) {
         // TODO: filter compilers that don't support /external.
-        compileArguments.push(escapeArgument(util.format('/external:I%s', include)));
+        compileArguments.push(escapeArgument(util.format('/external:I%s', include.path)));
       } else {
-        compileArguments.push(escapeArgument(util.format('/I%s', include)));
+        compileArguments.push(escapeArgument(util.format('/I%s', include.path)));
       }
     }
 
-    for (const define of indexReply.reply[CMakeApi.clientName].group.defines) {
+    for (const define of iterateIfExists(group, 'defines')) {
       compileArguments.push(escapeArgument(util.format('/D%s', define.define)));
     }
 
-    // TODO: handle pre-compiled headers
+    if (options.usePrecompiledHeaders) {
+      // TODO: handle pre-compiled headers
+    }
 
-    return compileArguments.join("");
+    return compileArguments.join(" ");
   }
 
   // --------------
@@ -937,21 +959,22 @@ class CMakeApi {
   }
 
   /**
-   * 
+   * Iterate through all CMake targets loaded in the call to 'loadApi' and extract both the compiler and command-line
+   * information from every compilation unit in the project. This will only capture C and CXX compilation units that
+   * are compiled with MSVC.
    * @param {*} target json filepath for the target reply data
-   * @param {*} options options for different command-line options:
-   *                    - useExternalIncludes: use /external to ignore CMake SYSTEM headers
+   * @param {CompilerCommandOptions} options options for different compiler features
    * @returns command-line data for each source file in the given target
    */
-  * compileCommandsIterator(target, options = {}) {
+  * compileCommandsIterator(options = {}) {
     if (!this.loaded) {
       throw new Error("CMakeApi: getCompileCommands called before API is loaded");
     }
 
-    for (target in this.targetFilepaths) {
-      targetData = _parseReplyFile(target);
-      for (var group of targetData.compileGroups) {
-        compilerInfo = undefined;
+    for (let target of this.targetFilepaths) {
+      let targetData = this._parseReplyFile(target);
+      for (let group of iterateIfExists(targetData, 'compileGroups')) {
+        let compilerInfo = undefined;
         switch (group.language) {
           case 'C':
             compilerInfo = this.cCompilerInfo;
@@ -960,14 +983,14 @@ class CMakeApi {
             compilerInfo = this.cxxCompilerInfo;
             break;
         }
-  
+
         if (compilerInfo) {
-          args = this._getCompileGroupArguments(group, options);
-          for (var sourceIndex of group.sourceIndexes) {
-            source = path.join(this.sourceRoot, targetData.sources[sourceIndex]);
-            var compileCommand = {
+          let args = this._getCompileGroupArguments(group, options);
+          for (let sourceIndex of iterateIfExists(group, 'sourceIndexes')) {
+            let source = path.join(this.sourceRoot, targetData.sources[sourceIndex].path);
+            let compileCommand = {
               source: source,
-              arguments: args,
+              args: args,
               compiler: compilerInfo
             };
             yield compileCommand;
@@ -987,13 +1010,13 @@ function findEspXEngine(clPath) {
   const clDir = path.dirname(clPath);
 
   // check if we already have the correct host/target pair
-  var dllPath = path.join(clDir, 'EspXEngine.dll');
+  let dllPath = path.join(clDir, 'EspXEngine.dll');
   if (fs.existsSync(dllPath)) {
     return dllPath;
   }
 
-  var targetName = '';
-  var hostDir = path.dirname(clDir);
+  let targetName = '';
+  let hostDir = path.dirname(clDir);
   switch (path.basename(hostDir)) {
     case 'HostX86':
       targetName = 'x86';
@@ -1024,12 +1047,13 @@ function findRulesetDirectory(clPath) {
 }
 
 /**
- * 
+ * Find ruleset first searching relative to GitHub repository and then relative to the official ruleset directory
+ * shipped in Visual Studio.
  * @param {*} rulesetDirectory path to directory containing all Visual Studio rulesets
- * @returns path to rulset found locally or inside Visual Studio
+ * @returns path to ruleset found locally or inside Visual Studio
  */
 function findRuleset(rulesetDirectory) {
-  var repoRulesetPath = resolveInputPath("ruleset");
+  let repoRulesetPath = resolveInputPath("ruleset");
   if (!repoRulesetPath) {
     return undefined;
   } else if (fs.existsSync(repoRulesetPath)) {
@@ -1053,6 +1077,7 @@ function findRuleset(rulesetDirectory) {
 /**
  * Construct all command-line arguments that will be common among all sources files of a given compiler.
  * @param {*} clPath path to the MSVC compiler
+ * @param {CompilerCommandOptions} options options for different compiler features
  * @returns analyze arguments concatinated into a single string.
  */
 function getCommonAnalyzeArguments(clPath, options = {}) {
@@ -1062,7 +1087,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
   args += escapeArgument(util.format(" /analyze:plugin%s", espXEngine));
 
   const rulesetDirectory = findRulesetDirectory(clPath);
-  const rulesetPath = findRuleset(rulesetDirectory);
+  const rulesetPath = findRuleset(rulesetDirectory);``
   if (rulesetPath != undefined) {
     args += escapeArgument(util.format(" /analyze:ruleset%s", rulesetPath))
 
@@ -1074,7 +1099,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
     core.warning('Ruleset is not being used, all warnings will be enabled.');
   }
 
-  if (options[useExternalIncludes]) {
+  if (options.useExternalIncludes) {
     args += "/analyze:external-";
   }
 
@@ -1086,23 +1111,23 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  * @returns the absolute path to the 'results' directory for SARIF files.
  */
  function prepareResultsDir() {
-  var outputDir = resolveInputPath("results", true);
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, {recursive: true}, err => {
+  let resultsDir = resolveInputPath("resultsDirectory", true);
+  if (!fs.existsSync(resultsDir)) {
+    fs.mkdirSync(resultsDir, {recursive: true}, err => {
       if (err) {
         throw new Error("Failed to create 'results' directory which did not exist.");
       }
     });
   }
 
-  var cleanSarif = core.getInput('cleanSarif');
+  let cleanSarif = core.getInput('cleanSarif');
   switch (cleanSarif.toLowerCase()) {
     case 'true':
     {
       // delete existing Sarif files that are consider stale
-      for (var file of fs.readdirSync(outputDir)) {
+      for (let file of fs.readdirSync(resultsDir)) {
         if (file.isFile() && path.extname(file.name).toLowerCase() == '.sarif') {
-          fs.unlinkSync(path.join(outputDir, file.name));
+          fs.unlinkSync(path.join(resultsDir, file.name));
         }
       }
       break;
@@ -1113,7 +1138,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
       throw new Error('Unsupported value for \'cleanSarif\'. Must be either \'True\' or \'False\'');
   }
 
-  return outputDir;
+  return resultsDir;
 }
 
 /**
@@ -1121,19 +1146,20 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  */
 if (require.main === require.cache[eval('__filename')]) {
   try {
-    var buildDir = resolveInputPath("cmakeBuildDir", true);
-    if (!fs.existsSync(repoRulesetPath)) {
+    let buildDir = resolveInputPath("cmakeBuildDirectory", true);
+    if (!fs.existsSync(buildDir)) {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
-
-    var resultsDir = prepareResultsDir();
 
     api = CMakeApi();
     api.loadApi(buildDir);
 
-    var analysisRan = false;
-    var commonArgCache = {};
-    for (var compileCommand of api.compileCommandsIterator()) {
+    let resultsDir = prepareResultsDir();
+
+    let analysisRan = false;
+    let commonArgCache = {};
+    let options = CompilerCommandOptions();
+    for (let compileCommand of api.compileCommandsIterator(options)) {
       clPath = compileCommand.compiler.path;
       if (clPath in commonArgCache) {
         commonArgCache[clPath] = getCommonAnalyzeArguments(clPath);
