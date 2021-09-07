@@ -19,6 +19,11 @@ const cmakeReplyDir = path.join(cmakeApiDir, "reply");
 const clPath = "C:/VS/root/Tools/MSVC/14.29.30133/bin/Hostx86/x86/cl.exe";
 const clInclude = "C:/VS/root/Tools/MSVC/14.29.30133/include";
 
+const PATHEnv = [
+    path.dirname(clPath),
+    path.dirname(cmakeExePath)
+].join(";");
+
 const cmakeIndexReply = path.join(cmakeReplyDir, "index-1.json");
 const cmakeCacheReply = path.join(cmakeReplyDir, "cache-1.json");
 const cmakeCodemodelReply = path.join(cmakeReplyDir, "codemodel-1.json");
@@ -256,10 +261,14 @@ describe("CMakeApi", () => {
         // default cmake folders
         td.when(fs.existsSync(cmakeBuildDir)).thenReturn(true);
         td.when(fs.existsSync(cmakeSrcDir)).thenReturn(true);
-        td.when(fs.existsSync(cmakeExePath)).thenReturn(true);
         td.when(fs.existsSync(cmakeApiDir)).thenReturn(true);
         td.when(fs.existsSync(cmakeQueryDir)).thenReturn(true);
         td.when(fs.existsSync(cmakeReplyDir)).thenReturn(true);
+        // cmakeBuildDir must be non-empty
+        td.when(fs.readdirSync(cmakeBuildDir)).thenReturn([".cmake"]);
+
+        td.when(fs.existsSync(cmakeExePath)).thenReturn(true);
+        process.env["PATH"] = PATHEnv;
 
         // default MSVC toolset
         td.when(fs.existsSync(clPath)).thenReturn(true);
@@ -316,9 +325,21 @@ describe("CMakeApi", () => {
 
         it("buildRoot does not exist", () => {
             td.when(fs.existsSync(cmakeBuildDir)).thenReturn(false);
-            expect(() => api.loadApi(cmakeBuildDir)).to.throw("Generated build root for CMake not found at: ");
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw("CMake build root not found at: ");
         });
-        
+
+        it("cmake exe does not exist", () => {
+            td.when(fs.existsSync(cmakeExePath)).thenReturn(false);
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw("cmake.exe is not accessible on the PATH");
+        });
+
+        it("cmake.exe failed to run", () => {
+            td.when(child_process.spawn(td.matchers.anything(), td.matchers.anything()))
+                .thenCallback(new Error(".exe failed"));
+            expect(() => api.loadApi(cmakeBuildDir)).to.throw(
+                "Unable to run CMake used previously to build cmake project.");
+        });
+
         it("cmake not run (missing .cmake/api dir)", () => {
             td.when(fs.existsSync(cmakeApiDir)).thenReturn(false);
             expect(() => api.loadApi(cmakeBuildDir)).to.throw(
@@ -330,18 +351,6 @@ describe("CMakeApi", () => {
                 reply.version.string = "3.13.6";
             });
             expect(() => api.loadApi(cmakeBuildDir)).to.throw("Action requires CMake version >= 3.13.7" );
-        });
-
-        it("cmake exe does not exist", () => {
-            td.when(fs.existsSync(cmakeExePath)).thenReturn(false);
-            expect(() => api.loadApi(cmakeBuildDir)).to.throw("Unable to find CMake used to build project at: ");
-        });
-
-        it("cmake.exe failed to run", () => {
-            td.when(child_process.spawn(td.matchers.anything(), td.matchers.anything()))
-                .thenCallback(new Error(".exe failed"));
-            expect(() => api.loadApi(cmakeBuildDir)).to.throw(
-                "Unable to run CMake used previously to build cmake project.");
         });
 
         msvcNotUsedTests();
@@ -361,7 +370,8 @@ describe("CMakeApi", () => {
                 reply.version.string = "3.13.7";
                 reply.reply["client-msvc-ca-action"]["query.json"].responses = [
                     { "kind" : "cache", "jsonFile" : path.basename(cmakeCacheReply) },
-                    { "kind" : "codemodel", "jsonFile" : path.basename(cmakeCodemodelReply) }
+                    { "kind" : "codemodel", "jsonFile" : path.basename(cmakeCodemodelReply) },
+                    { "error" : "unknown request kind 'toolchains'" }
                 ];
             });
         });

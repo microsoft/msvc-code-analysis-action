@@ -602,6 +602,20 @@ function extractIncludesFromCompilerPath(compilerPath) {
   return [ path.normalize(includeDir) ];
 }
 
+// TODO: replace with io.where
+// Find executable relative to the CWD or the system PATH
+function findExecutableOnPath(executable) {
+  var paths = process.cwd() + ';' + process.env.PATH;
+  for (const pathDir of paths.split(';')) {
+    const executablePath = path.join(pathDir, executable);
+    if (fs.existsSync(executablePath)) {
+      return executablePath;
+    }
+  }
+
+  throw new Error(executable + ' is not accessible on the PATH');
+}
+
 /**
  * Validate and resolve action input path by making non-absolute paths relative to
  * GitHub repository root.
@@ -690,26 +704,21 @@ class CMakeApi {
    * @param {*} apiDir CMake API directory '.cmake/api/v1'
    * @param {*} cmakeVersion CMake version to limit data that can be requested
    */
-  _createApiQuery(apiDir, cmakeVersion) {
+  _createApiQuery(apiDir) {
     const queryDir = path.join(apiDir, "query", CMakeApi.clientName);
-    fs.mkdirSync(queryDir);
+    if (!fs.existsSync(queryDir)) {
+      fs.mkdirSync(queryDir, err => {
+        if (err) {
+          throw new Error("Failed to create CMake Api Query directory.", err);
+        }
+      });
+    }
 
-    const queryDataLegacy = {
-      requests: [
-        { kind: "cache", version: "2" },
-        { kind: "codemodel", version: "2" }
-      ]
-    };
-
-    const queryDataWithToolchains = {
-      requests: [
-        { kind: "cache", version: "2" },
-        { kind: "codemodel", version: "2" },
-        { kind: "toolchains", version: "1" }
-      ]
-    };
-
-    const queryData = cmakeVersion > "3.20.5" ? queryDataLegacy : queryDataWithToolchains;
+    const queryData = [
+      { kind: "cache", version: "2" },
+      { kind: "codemodel", version: "2" },
+      { kind: "toolchains", version: "1" }
+    ];
     const queryFile = path.join(queryDir, "query.json");
     fs.writeFile(queryFile, JSON.stringify(queryData), err => {
       if (err) {
@@ -724,8 +733,12 @@ class CMakeApi {
    * @returns parsed json data for reply/index-xxx.json
    */
   _getApiReplyIndex(apiDir) {
-    let indexFilepath;
     const replyDir = path.join(apiDir, "reply");
+    if (!fs.existsSync(replyDir)) {
+      throw new Error("Failed to generate CMake Api Reply files");
+    }
+
+    let indexFilepath;
     for (const filepath of fs.readdirSync(replyDir)) {
       if (path.basename(filepath).startsWith("index-")) {
         // Get the most recent index query file (ordered lexicographically)
@@ -829,15 +842,19 @@ class CMakeApi {
   }
 
   /**
-   * 
+   * Load the reply index file for CMake API and load all requested reply responses
    * @param {*} apiDir CMake API directory '.cmake/api/v1'
    */
   _loadReplyFiles(apiDir) {
+    const indexReply = this._getApiReplyIndex(apiDir);
+    if (indexReply.version.string < "3.13.7") {
+      throw new Error("Action requires CMake version >= 3.13.7");
+    }
+
     let cacheLoaded = false;
     let codemodelLoaded = false;
     let toolchainLoaded = false;
     const replyDir = path.join(apiDir, "reply");
-    const indexReply = this._getApiReplyIndex(apiDir);
     const clientReplies = indexReply.reply[CMakeApi.clientName];
     for (const response of iterateIfExists(clientReplies["query.json"], 'responses')) {
       switch (response["kind"]) {
@@ -854,7 +871,7 @@ class CMakeApi {
           this._loadToolchains(path.join(replyDir, response.jsonFile));
           break;
         default:
-          throw new Error("CMakeApi: Unknown reply response kind received: " + response.kind);
+          // do nothing as unsupported responses will be { "error" : "unknown request kind 'xxx'" }
       }
     }
 
@@ -867,6 +884,7 @@ class CMakeApi {
     }
 
     if (!toolchainLoaded) {
+      // Toolchains is only available in CMake >= 3.20.5. Attempt to load from cache.
       this._loadToolchainsFromCache();
     }
   }
@@ -924,27 +942,20 @@ class CMakeApi {
     }
 
     if (!fs.existsSync(buildRoot)) {
-      throw new Error("Generated build root for CMake not found at: " + buildRoot);
+      throw new Error("CMake build root not found at: " + buildRoot);
+    } else if (fs.readdirSync(buildRoot).length == 0) {
+      throw new Error("CMake build root must be non-empty as project should already be configured");
     }
 
+    // TODO: make code async and replace with io.which("cmake")
+    const cmakePath = findExecutableOnPath("cmake.exe");
+
     const apiDir = path.join(buildRoot, ".cmake/api/v1");
-    if (!fs.existsSync(apiDir)) {
-      throw new Error(".cmake/api/v1 missing, run CMake config before using action.");
-    }
 
     // read existing reply index to get CMake executable and version
     const indexQuery = this._getApiReplyIndex(apiDir);
-    const cmakeVersion = indexQuery.version.string;
-    if (cmakeVersion < "3.13.7") {
-      throw new Error("Action requires CMake version >= 3.13.7");
-    }
 
-    const cmakePath = indexQuery.paths.cmake;
-    if (!fs.existsSync(cmakePath)) {
-      throw new Error("Unable to find CMake used to build project at: " + cmakePath);
-    }
-
-    this._createApiQuery(apiDir, cmakeVersion)
+    this._createApiQuery(apiDir)
 
     // regenerate CMake build directory to acquire CMake file API reply
     child_process.spawn(cmakePath, buildRoot, (err) => {
@@ -952,6 +963,16 @@ class CMakeApi {
         throw new Error("Unable to run CMake used previously to build cmake project.");
       }
     });
+
+    const cmakeVersion = indexQuery.version.string;
+    if (cmakeVersion < "3.13.7") {
+      throw new Error("Action requires CMake version >= 3.13.7");
+    }
+
+
+    if (!fs.existsSync(apiDir)) {
+      throw new Error(".cmake/api/v1 missing, run CMake config before using action.");
+    }
 
     this._loadReplyFiles(apiDir);
 
