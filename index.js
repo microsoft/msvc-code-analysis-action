@@ -620,22 +620,17 @@ if (require.main === module) {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
 
-    api = new CMakeApi();
+    let api = new CMakeApi();
     api.loadApi(buildDir);
 
     let resultsDir = prepareResultsDir();
 
     let analysisRan = false;
-    let commonArgCache = {};
     let options = CompilerCommandOptions();
     for (let compileCommand of api.compileCommandsIterator(options)) {
-      clPath = compileCommand.compiler.path;
-      if (clPath in commonArgCache) {
-        commonArgCache[clPath] = getCommonAnalyzeArguments(clPath);
-      }
-
       // add cmake and analyze arguments
-      clArguments = compileCommand.args + commonArgCache[clPath];
+      let clPath = compileCommand.compiler.path;
+      clArguments = compileCommand.args + " " + getCommonAnalyzeArguments(clPath);
 
       // add argument for unique log filepath in results directory
       // TODO: handle clashing source filenames in project
