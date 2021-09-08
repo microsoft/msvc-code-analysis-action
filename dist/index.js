@@ -1172,7 +1172,7 @@ if (require.main === require.cache[eval('__filename')]) {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
 
-    api = CMakeApi();
+    api = new CMakeApi();
     api.loadApi(buildDir);
 
     let resultsDir = prepareResultsDir();
