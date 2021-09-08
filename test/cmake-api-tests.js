@@ -334,10 +334,10 @@ describe("CMakeApi", () => {
         });
 
         it("cmake.exe failed to run", () => {
-            td.when(child_process.spawn(td.matchers.anything(), td.matchers.anything()))
+            td.when(child_process.execSync(td.matchers.anything()))
                 .thenCallback(new Error(".exe failed"));
             expect(() => api.loadApi(cmakeBuildDir)).to.throw(
-                "Unable to run CMake used previously to build cmake project.");
+                "Failed to run CMake with error: ");
         });
 
         it("cmake not run (missing .cmake/api dir)", () => {
