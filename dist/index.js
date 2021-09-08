@@ -1207,6 +1207,7 @@ if (require.main === require.cache[eval('__filename')]) {
 
   } catch (error) {
     core.setFailed(error.message);
+    core.error(error.stack)
   }
 }
 })();

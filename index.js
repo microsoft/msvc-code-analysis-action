@@ -655,5 +655,6 @@ if (require.main === module) {
 
   } catch (error) {
     core.setFailed(error.message);
+    core.error(error.stack)
   }
 }
