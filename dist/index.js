@@ -952,7 +952,7 @@ class CMakeApi {
     this._createApiQuery(apiDir)
 
     // regenerate CMake build directory to acquire CMake file API reply
-    child_process.spawn(cmakePath, buildRoot, (err) => {
+    child_process.spawn(cmakePath, [ buildRoot ], (err) => {
       if (err) {
         throw new Error("Unable to run CMake used previously to build cmake project.");
       }
@@ -1184,8 +1184,18 @@ if (require.main === require.cache[eval('__filename')]) {
       // TODO: only set on child process (NIT)
       process.env.CAEmitSarifLog = 1;
 
-      // TODO: handle errors and stdout better
-      spawn(clPath, clArguments);
+      // TODO: stdout/stderr to log files
+      // TODO: timeouts
+      exec(util.format("'%s%' %s", clPath, clArguments), (err, stdout, stderr) => {
+        if (err) {
+          core.warning("Compilation failed for source file:")
+          core.info("Stdout:");
+          core.info(stdout);
+          core.info("Stderr:");
+          core.info(stderr);
+        }
+      });
+
       analysisRan = true;
     }
 
