@@ -939,9 +939,7 @@ class CMakeApi {
   loadApi(buildRoot) {
     if (!buildRoot) {
       throw new Error("CMakeApi: 'buildRoot' can not be null or empty.");
-    }
-
-    if (!fs.existsSync(buildRoot)) {
+    } else if (!fs.existsSync(buildRoot)) {
       throw new Error("CMake build root not found at: " + buildRoot);
     } else if (fs.readdirSync(buildRoot).length == 0) {
       throw new Error("CMake build root must be non-empty as project should already be configured");
@@ -951,10 +949,6 @@ class CMakeApi {
     const cmakePath = findExecutableOnPath("cmake.exe");
 
     const apiDir = path.join(buildRoot, ".cmake/api/v1");
-
-    // read existing reply index to get CMake executable and version
-    const indexQuery = this._getApiReplyIndex(apiDir);
-
     this._createApiQuery(apiDir)
 
     // regenerate CMake build directory to acquire CMake file API reply
@@ -963,12 +957,6 @@ class CMakeApi {
         throw new Error("Unable to run CMake used previously to build cmake project.");
       }
     });
-
-    const cmakeVersion = indexQuery.version.string;
-    if (cmakeVersion < "3.13.7") {
-      throw new Error("Action requires CMake version >= 3.13.7");
-    }
-
 
     if (!fs.existsSync(apiDir)) {
       throw new Error(".cmake/api/v1 missing, run CMake config before using action.");
