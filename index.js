@@ -155,7 +155,7 @@ class CMakeApi {
   _createApiQuery(apiDir) {
     const queryDir = path.join(apiDir, "query", CMakeApi.clientName);
     if (!fs.existsSync(queryDir)) {
-      fs.mkdirSync(queryDir, err => {
+      fs.mkdirSync(queryDir, { recursive : true }, err => {
         if (err) {
           throw new Error("Failed to create CMake Api Query directory.", err);
         }
@@ -570,7 +570,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  function prepareResultsDir() {
   let resultsDir = resolveInputPath("resultsDirectory", true);
   if (!fs.existsSync(resultsDir)) {
-    fs.mkdirSync(resultsDir, {recursive: true}, err => {
+    fs.mkdirSync(resultsDir, { recursive: true }, err => {
       if (err) {
         throw new Error("Failed to create 'results' directory which did not exist.");
       }
