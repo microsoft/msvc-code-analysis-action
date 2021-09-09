@@ -269,6 +269,8 @@ describe("CMakeApi", () => {
 
         td.when(fs.existsSync(cmakeExePath)).thenReturn(true);
         process.env["PATH"] = PATHEnv;
+        td.when(child_process.spawnSync(td.matchers.anything(), td.matchers.anything()))
+            .thenReturn({"error": undefined});
 
         // default MSVC toolset
         td.when(fs.existsSync(clPath)).thenReturn(true);
@@ -334,8 +336,8 @@ describe("CMakeApi", () => {
         });
 
         it("cmake.exe failed to run", () => {
-            td.when(child_process.execFileSync(td.matchers.anything(), td.matchers.anything()))
-                .thenCallback(new Error(".exe failed"));
+            td.when(child_process.spawnSync(td.matchers.anything(), td.matchers.anything()))
+                .thenReturn({"error": new Error(".exe failed")});
             expect(() => api.loadApi(cmakeBuildDir)).to.throw(
                 "Failed to run CMake with error: ");
         });

@@ -952,11 +952,10 @@ class CMakeApi {
     this._createApiQuery(apiDir)
 
     // regenerate CMake build directory to acquire CMake file API reply
-    child_process.execFileSync(cmakePath, [ buildRoot ], (err) => {
-      if (err) {
-        throw new Error(`Failed to run CMake with error: ${err}.`);
-      }
-    });
+    let cmake = child_process.spawnSync(cmakePath, [ buildRoot ]);
+    if (cmake.error) {
+      throw new Error(`Failed to run CMake with error: ${cmake.error}.`);
+    }
 
     if (!fs.existsSync(apiDir)) {
       throw new Error(".cmake/api/v1 missing, run CMake config before using action.");
@@ -1186,15 +1185,15 @@ if (require.main === require.cache[eval('__filename')]) {
 
       // TODO: stdout/stderr to log files
       // TODO: timeouts
-      child_process.execSync(`'${clPath}' ${clArguments}`, (err, stdout, stderr) => {
-        if (err) {
-          core.warning("Compilation failed for source file:")
-          core.info("Stdout:");
-          core.info(stdout);
-          core.info("Stderr:");
-          core.info(stderr);
-        }
-      });
+      try {
+        child_process.execSync(`'${clPath}' ${clArguments}`);
+      } catch (err) {
+        core.warning(`Compilation failed for source file.`)
+        core.info("Stdout:");
+        core.info(err.stdout);
+        core.info("Stderr:");
+        core.info(err.stderr);
+      }
 
       analysisRan = true;
     }
