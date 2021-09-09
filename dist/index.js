@@ -1074,6 +1074,7 @@ function findRuleset(rulesetDirectory) {
   if (!repoRulesetPath) {
     return undefined;
   } else if (fs.existsSync(repoRulesetPath)) {
+    core.info(`Found ruleset: ${repoRulesetPath}`);
     return repoRulesetPath;
   }
 
@@ -1081,7 +1082,9 @@ function findRuleset(rulesetDirectory) {
   const rulesetPath = core.getInput("ruleset");
   if (rulesetDirectory != undefined) {
     const officialRulesetPath = path.join(rulesetDirectory, rulesetPath);
+    core.info(`Looking for ruleset shipped with Visual Studio at: ${rulesetDirectory}`);
     if (fs.existsSync(officialRulesetPath)) {
+      core.info(`Found official ruleset: ${officialRulesetPath}`);
       return officialRulesetPath;
     }
   } else {
@@ -1195,7 +1198,9 @@ if (require.main === require.cache[eval('__filename')]) {
       // TODO: stdout/stderr to log files
       // TODO: timeouts
       try {
-        child_process.execSync(`'${clPath}' ${clArguments}`);
+        const command = `'${clPath}' ${clArguments}`;
+        core.info(`Running analysis: ${command}`);
+        child_process.execSync(command);
       } catch (err) {
         core.warning(`Compilation failed for source file.`)
         core.info("Stdout:");
