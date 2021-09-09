@@ -856,6 +856,9 @@ class CMakeApi {
       throw new Error("Action requires CMake version >= 3.13.7");
     }
 
+    core.info(`Loading responses from index-xxx.json with CMake version ${indexReply.cmake.version.string}`);
+    core.debug(indexReply);
+
     let cacheLoaded = false;
     let codemodelLoaded = false;
     let toolchainLoaded = false;
