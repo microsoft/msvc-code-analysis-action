@@ -1174,7 +1174,7 @@ if (require.main === require.cache[eval('__filename')]) {
     let resultsDir = prepareResultsDir();
 
     let analysisRan = false;
-    let options = CompilerCommandOptions();
+    let options = new CompilerCommandOptions();
     for (let compileCommand of api.compileCommandsIterator(options)) {
       // add cmake and analyze arguments
       let clPath = compileCommand.compiler.path;
