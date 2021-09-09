@@ -858,7 +858,7 @@ class CMakeApi {
     }
 
     core.info(`Loading responses from index-xxx.json with CMake version ${indexReply.cmake.version.string}`);
-    core.debug(`Reply contents: ${indexReply}`);
+    core.debug(`Reply contents: ${JSON.stringify(indexReply, null, "  ")}`);
 
     let cacheLoaded = false;
     let codemodelLoaded = false;
