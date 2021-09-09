@@ -474,7 +474,7 @@ function findEspXEngine(clPath) {
   }
 
   let targetName = '';
-  let hostDir = path.dirname(clDir);
+  const hostDir = path.dirname(clDir);
   switch (path.basename(hostDir)) {
     case 'HostX86':
       targetName = 'x86';
@@ -511,7 +511,7 @@ function findRulesetDirectory(clPath) {
  * @returns path to ruleset found locally or inside Visual Studio
  */
 function findRuleset(rulesetDirectory) {
-  let repoRulesetPath = resolveInputPath("ruleset");
+  const repoRulesetPath = resolveInputPath("ruleset");
   if (!repoRulesetPath) {
     return undefined;
   } else if (fs.existsSync(repoRulesetPath)) {
@@ -539,9 +539,9 @@ function findRuleset(rulesetDirectory) {
  * @returns analyze arguments concatenated into a single string.
  */
 function getCommonAnalyzeArguments(clPath, options = {}) {
-  args = " /analyze:quiet /analyze:log:format:sarif";
+  let args = " /analyze:quiet /analyze:log:format:sarif";
 
-  espXEngine = findEspXEngine(clPath);
+  const espXEngine = findEspXEngine(clPath);
   args += escapeArgument(util.format(" /analyze:plugin%s", espXEngine));
 
   const rulesetDirectory = findRulesetDirectory(clPath);
@@ -558,7 +558,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
   }
 
   if (options.useExternalIncludes) {
-    args += "/analyze:external-";
+    args += " /analyze:external-";
   }
 
   return args;
@@ -569,7 +569,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  * @returns the absolute path to the 'results' directory for SARIF files.
  */
  function prepareResultsDir() {
-  let resultsDir = resolveInputPath("resultsDirectory", true);
+  const  resultsDir = resolveInputPath("resultsDirectory", true);
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir, { recursive: true }, err => {
       if (err) {
@@ -578,12 +578,12 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
     });
   }
 
-  let cleanSarif = core.getInput('cleanSarif');
+  const cleanSarif = core.getInput('cleanSarif');
   switch (cleanSarif.toLowerCase()) {
     case 'true':
     {
       // delete existing Sarif files that are consider stale
-      for (let entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
+      for (const entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
         if (entry.isFile() && path.extname(entry.name).toLowerCase() == '.sarif') {
           fs.unlinkSync(path.join(resultsDir, entry.name));
         }
@@ -604,7 +604,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  */
 if (require.main === module) {
   try {
-    let buildDir = resolveInputPath("cmakeBuildDirectory", true);
+    const buildDir = resolveInputPath("cmakeBuildDirectory", true);
     if (!fs.existsSync(buildDir)) {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
@@ -612,18 +612,18 @@ if (require.main === module) {
     let api = new CMakeApi();
     api.loadApi(buildDir);
 
-    let resultsDir = prepareResultsDir();
+    const resultsDir = prepareResultsDir();
 
     let analysisRan = false;
-    let options = new CompilerCommandOptions();
+    const options = new CompilerCommandOptions();
     for (let compileCommand of api.compileCommandsIterator(options)) {
       // add cmake and analyze arguments
-      let clPath = compileCommand.compiler.path;
-      clArguments = compileCommand.args + " " + getCommonAnalyzeArguments(clPath);
+      const clPath = compileCommand.compiler.path;
+      let clArguments = compileCommand.args + " " + getCommonAnalyzeArguments(clPath);
 
       // add argument for unique log filepath in results directory
       // TODO: handle clashing source filenames in project
-      sarifFile = path.join(resultsDir, path.basename(compileCommand.source));
+      const sarifFile = path.join(resultsDir, path.basename(compileCommand.source));
       clArguments += escapeArgument(util.format(" /analyze:log%s", sarifFile));
 
       // add source file
