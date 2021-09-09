@@ -852,7 +852,7 @@ class CMakeApi {
    */
   _loadReplyFiles(apiDir) {
     const indexReply = this._getApiReplyIndex(apiDir);
-    if (indexReply.version.string < "3.13.7") {
+    if (indexReply.cmake.version.string < "3.13.7") {
       throw new Error("Action requires CMake version >= 3.13.7");
     }
 
@@ -889,7 +889,7 @@ class CMakeApi {
     }
 
     if (!toolchainLoaded) {
-      // Toolchains is only available in CMake >= 3.20.5. Attempt to load from cache.
+      // toolchains is only available in CMake >= 3.20.5. Attempt to load from cache.
       this._loadToolchainsFromCache();
     }
   }
@@ -1016,7 +1016,7 @@ class CMakeApi {
 
 /**
  * Find EspXEngine.dll as it only exists in host/target bin for MSVC Visual Studio release.
- * @param {*} clPath path to the MSVC c ompiler
+ * @param {*} clPath path to the MSVC compiler
  * @returns path to EspXEngine.dll
  */
 function findEspXEngine(clPath) {
@@ -1091,7 +1091,7 @@ function findRuleset(rulesetDirectory) {
  * Construct all command-line arguments that will be common among all sources files of a given compiler.
  * @param {*} clPath path to the MSVC compiler
  * @param {CompilerCommandOptions} options options for different compiler features
- * @returns analyze arguments concatinated into a single string.
+ * @returns analyze arguments concatenated into a single string.
  */
 function getCommonAnalyzeArguments(clPath, options = {}) {
   args = " /analyze:quiet /analyze:log:format:sarif";

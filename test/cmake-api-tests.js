@@ -11,7 +11,7 @@ chai.should();
 
 const cmakeExePath = path.normalize("C:\\path\\to\\cmake.exe");
 const cmakeBuildDir = path.normalize("path\\to\\cmake\\build");
-const cmakeSrcDir = path.normalize("path\\to\\project/src");
+const cmakeSrcDir = path.normalize("path\\to\\project\\src");
 
 const cmakeApiDir = path.join(cmakeBuildDir, path.normalize(".cmake\\api\\v1"));
 const cmakeQueryDir = path.join(cmakeApiDir, "query");
@@ -34,15 +34,17 @@ const cmakeTarget2Reply = "target-2.json";
 
 let defaultFileContents = {};
 defaultFileContents[cmakeIndexReply] = {
-    "generator": {
-        "multiConfig": true,
-        "name": "Visual Studio 17 2022"
-    },
-    "paths": {
-        "cmake": cmakeExePath
-    },
-    "version": {
-        "string": "3.21.6"
+    "cmake": {
+        "generator": {
+            "multiConfig": true,
+            "name": "Visual Studio 17 2022"
+        },
+        "paths": {
+            "cmake": cmakeExePath
+        },
+        "version": {
+            "string": "3.21.6"
+        },
     },
     "reply" : {
         "client-fake": {
@@ -353,7 +355,7 @@ describe("CMakeApi", () => {
 
         it("cmake version < 3.13.7", () => {
             editReplyContents(cmakeIndexReply, (reply) => {
-                reply.version.string = "3.13.6";
+                reply.cmake.version.string = "3.13.6";
             });
             expect(() => api.loadApi(cmakeBuildDir)).to.throw("Action requires CMake version >= 3.13.7" );
         });
@@ -372,7 +374,7 @@ describe("CMakeApi", () => {
     describe("no toolchains", () => {
         beforeEach(() => {
             editReplyContents(cmakeIndexReply, (reply) => {
-                reply.version.string = "3.13.7";
+                reply.cmake.version.string = "3.13.7";
                 reply.reply["client-msvc-ca-action"]["query.json"].responses = [
                     { "kind" : "cache", "jsonFile" : cmakeCacheReply },
                     { "kind" : "codemodel", "jsonFile" : cmakeCodemodelReply },
