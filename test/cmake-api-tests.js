@@ -1,5 +1,6 @@
 "use strict";
 
+const assert = require("assert");
 const chai = require("chai");
 const path = require("path");
 const rewire = require("rewire");
@@ -24,12 +25,12 @@ const PATHEnv = [
     path.dirname(cmakeExePath)
 ].join(";");
 
-const cmakeIndexReply = path.join(cmakeReplyDir, "index-1.json");
-const cmakeCacheReply = path.join(cmakeReplyDir, "cache-1.json");
-const cmakeCodemodelReply = path.join(cmakeReplyDir, "codemodel-1.json");
-const cmakeToolchainsReply = path.join(cmakeReplyDir, "toolchains-1.json");
-const cmakeTarget1Reply = path.join(cmakeReplyDir, "target-1.json");
-const cmakeTarget2Reply = path.join(cmakeReplyDir, "target-2.json");
+const cmakeIndexReply = "index-1.json";
+const cmakeCacheReply = "cache-1.json";
+const cmakeCodemodelReply = "codemodel-1.json";
+const cmakeToolchainsReply = "toolchains-1.json";
+const cmakeTarget1Reply = "target-1.json";
+const cmakeTarget2Reply = "target-2.json";
 
 let defaultFileContents = {};
 defaultFileContents[cmakeIndexReply] = {
@@ -50,9 +51,9 @@ defaultFileContents[cmakeIndexReply] = {
         "client-msvc-ca-action" : {
             "query.json" : {
                 "responses": [
-                    { "kind" : "cache", "jsonFile" : path.basename(cmakeCacheReply) },
-                    { "kind" : "codemodel", "jsonFile" : path.basename(cmakeCodemodelReply) },
-                    { "kind" : "toolchains", "jsonFile" : path.basename(cmakeToolchainsReply) }
+                    { "kind" : "cache", "jsonFile" : cmakeCacheReply },
+                    { "kind" : "codemodel", "jsonFile" : cmakeCodemodelReply },
+                    { "kind" : "toolchains", "jsonFile" : cmakeToolchainsReply }
                 ]
             }
         }
@@ -69,14 +70,14 @@ defaultFileContents[cmakeCodemodelReply] = {
         {
             "name": "Regular",
             "targets": [
-                { "jsonFile": path.basename(cmakeTarget1Reply) },
-                { "jsonFile": path.basename(cmakeTarget2Reply) }
+                { "jsonFile": cmakeTarget1Reply },
+                { "jsonFile": cmakeTarget2Reply }
             ]
         },
         {
             "name": "OnlyTarget2",
             "targets": [
-                { "jsonFile": path.basename(cmakeTarget2Reply) }
+                { "jsonFile": cmakeTarget2Reply }
             ]
         }
     ]
@@ -204,14 +205,16 @@ describe("CMakeApi", () => {
     let api;
     let options;
 
-    function setFileContents(filepath) {
+    function setReplyContents(filename) {
+        const filepath = path.join(cmakeReplyDir, filename);
         td.when(fs.existsSync(filepath)).thenReturn(true);
         td.when(fs.readFileSync(filepath, td.matchers.anything())).thenReturn(
-            JSON.stringify(defaultFileContents[filepath]));
+            JSON.stringify(defaultFileContents[filename]));
     }
 
-    function editFileContents(filepath, editCallback) {
-        let contents = JSON.parse(JSON.stringify(defaultFileContents[filepath]));
+    function editReplyContents(filename, editCallback) {
+        const filepath = path.join(cmakeReplyDir, filename);
+        let contents = JSON.parse(JSON.stringify(defaultFileContents[filename]));
         editCallback(contents);
         td.when(fs.readFileSync(filepath, td.matchers.anything())).thenReturn(JSON.stringify(contents));
     }
@@ -278,8 +281,8 @@ describe("CMakeApi", () => {
 
         // default reply files
         td.when(fs.readdirSync(cmakeReplyDir)).thenReturn(Object.keys(defaultFileContents));
-        for (const file of Object.keys(defaultFileContents)) {
-            setFileContents(file);
+        for (const filename of Object.keys(defaultFileContents)) {
+            setReplyContents(filename);
         }
     });
 
@@ -299,11 +302,11 @@ describe("CMakeApi", () => {
 
     let msvcNotUsedTests = function() {
         beforeEach(() => {
-            editFileContents(cmakeCacheReply, (reply) => {
+            editReplyContents(cmakeCacheReply, (reply) => {
                 reply.entries[CLangIndex].value = "clang.exe";
                 reply.entries[CXXLangIndex].value = "clang.exe";
             });
-            editFileContents(cmakeToolchainsReply, (reply) => {
+            editReplyContents(cmakeToolchainsReply, (reply) => {
                 reply.toolchains[CLangIndex].compiler.path = "clang.exe";
                 reply.toolchains[CLangIndex].compiler.id = "Clang";
                 reply.toolchains[CXXLangIndex].compiler.path = "clang.exe";
@@ -349,7 +352,7 @@ describe("CMakeApi", () => {
         });
 
         it("cmake version < 3.13.7", () => {
-            editFileContents(cmakeIndexReply, (reply) => {
+            editReplyContents(cmakeIndexReply, (reply) => {
                 reply.version.string = "3.13.6";
             });
             expect(() => api.loadApi(cmakeBuildDir)).to.throw("Action requires CMake version >= 3.13.7" );
@@ -368,11 +371,11 @@ describe("CMakeApi", () => {
 
     describe("no toolchains", () => {
         beforeEach(() => {
-            editFileContents(cmakeIndexReply, (reply) => {
+            editReplyContents(cmakeIndexReply, (reply) => {
                 reply.version.string = "3.13.7";
                 reply.reply["client-msvc-ca-action"]["query.json"].responses = [
-                    { "kind" : "cache", "jsonFile" : path.basename(cmakeCacheReply) },
-                    { "kind" : "codemodel", "jsonFile" : path.basename(cmakeCodemodelReply) },
+                    { "kind" : "cache", "jsonFile" : cmakeCacheReply },
+                    { "kind" : "codemodel", "jsonFile" : cmakeCodemodelReply },
                     { "error" : "unknown request kind 'toolchains'" }
                 ];
             });

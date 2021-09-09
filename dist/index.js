@@ -481,6 +481,13 @@ module.exports = require("child_process");
 
 /***/ }),
 
+/***/ 82:
+/***/ ((module) => {
+
+module.exports = require("console");
+
+/***/ }),
+
 /***/ 747:
 /***/ ((module) => {
 
@@ -557,6 +564,7 @@ const fs = __nccwpck_require__(747);
 const path = __nccwpck_require__(622);
 const child_process = __nccwpck_require__(129);
 const util = __nccwpck_require__(669);
+const { assert } = __nccwpck_require__(82);
 
 const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Analysis Tools\\Rule Sets';
 
@@ -682,10 +690,6 @@ class CMakeApi {
    * @returns Parsed json data of the reply file
    */
   _parseReplyFile(replyFile) {
-    if (!replyFile) {
-      throw new Error("Failed to find CMake API reply file.");
-    }
-
     if (!fs.existsSync(replyFile)) {
       throw new Error("Failed to find CMake API reply file: " + replyFile);
     }
@@ -739,9 +743,10 @@ class CMakeApi {
     }
 
     let indexFilepath;
-    for (const filepath of fs.readdirSync(replyDir)) {
-      if (path.basename(filepath).startsWith("index-")) {
+    for (const filename of fs.readdirSync(replyDir)) {
+      if (filename.startsWith("index-")) {
         // Get the most recent index query file (ordered lexicographically)
+        const filepath = path.join(replyDir, filename);
         if (!indexFilepath || filepath > indexFilepath) {
           indexFilepath = filepath;
         }
@@ -1133,9 +1138,9 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
     case 'true':
     {
       // delete existing Sarif files that are consider stale
-      for (let file of fs.readdirSync(resultsDir)) {
-        if (file.isFile() && path.extname(file.name).toLowerCase() == '.sarif') {
-          fs.unlinkSync(path.join(resultsDir, file.name));
+      for (let entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
+        if (entry.isFile() && path.extname(entry.name).toLowerCase() == '.sarif') {
+          fs.unlinkSync(path.join(resultsDir, entry.name));
         }
       }
       break;
