@@ -159,11 +159,12 @@ class CMakeApi {
       });
     }
 
-    const queryData = [
-      { kind: "cache", version: "2" },
-      { kind: "codemodel", version: "2" },
-      { kind: "toolchains", version: "1" }
-    ];
+    const queryData = {
+      "requests": [
+        { kind: "cache", version: "2" },
+        { kind: "codemodel", version: "2" },
+        { kind: "toolchains", version: "1" }
+    ]};
     const queryFile = path.join(queryDir, "query.json");
     fs.writeFile(queryFile, JSON.stringify(queryData), err => {
       if (err) {
@@ -298,7 +299,7 @@ class CMakeApi {
     }
 
     core.info(`Loading responses from index-xxx.json with CMake version ${indexReply.cmake.version.string}`);
-    core.debug(indexReply);
+    core.debug(`Reply contents: ${indexReply}`);
 
     let cacheLoaded = false;
     let codemodelLoaded = false;
