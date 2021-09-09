@@ -334,7 +334,7 @@ describe("CMakeApi", () => {
         });
 
         it("cmake.exe failed to run", () => {
-            td.when(child_process.execSync(td.matchers.anything()))
+            td.when(child_process.execFileSync(td.matchers.anything(), td.matchers.anything()))
                 .thenCallback(new Error(".exe failed"));
             expect(() => api.loadApi(cmakeBuildDir)).to.throw(
                 "Failed to run CMake with error: ");
