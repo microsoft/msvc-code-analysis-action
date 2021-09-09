@@ -725,7 +725,7 @@ class CMakeApi {
         { kind: "toolchains", version: "1" }
     ]};
     const queryFile = path.join(queryDir, "query.json");
-    fs.writeFile(queryFile, JSON.stringify(queryData), 'utf-8', err => {
+    fs.writeFileSync(queryFile, JSON.stringify(queryData), 'utf-8', err => {
       if (err) {
         throw new Error("Failed to write query.json file for CMake API.", err);
       }
