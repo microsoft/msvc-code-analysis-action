@@ -720,9 +720,9 @@ class CMakeApi {
 
     const queryData = {
       "requests": [
-        { kind: "cache", version: "2" },
-        { kind: "codemodel", version: "2" },
-        { kind: "toolchains", version: "1" }
+        { kind: "cache", version: 2 },
+        { kind: "codemodel", version: 2 },
+        { kind: "toolchains", version: 1 }
     ]};
     const queryFile = path.join(queryDir, "query.json");
     fs.writeFileSync(queryFile, JSON.stringify(queryData), 'utf-8', err => {
