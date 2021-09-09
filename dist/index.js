@@ -952,7 +952,7 @@ class CMakeApi {
     this._createApiQuery(apiDir)
 
     // regenerate CMake build directory to acquire CMake file API reply
-    child_process.execSync(`'${cmakePath}' '${buildRoot}'`, (err) => {
+    child_process.execFileSync(cmakePath, [ buildRoot ], (err) => {
       if (err) {
         throw new Error(`Failed to run CMake with error: ${err}.`);
       }
@@ -1204,8 +1204,7 @@ if (require.main === require.cache[eval('__filename')]) {
     }
 
   } catch (error) {
-    core.setFailed(error.message);
-    core.error(error.stack)
+    core.setFailed(error.stack)
   }
 }
 })();
