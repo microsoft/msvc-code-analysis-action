@@ -163,14 +163,14 @@ async function loadCMakeApiReplies(buildRoot) {
   }
 
   // validate CMake is findable on the path
-  const cmakePath = await io.which("cmake", true);
+  await io.which("cmake", true);
 
   // create CMake api query file for the generation of replies needed
   const apiDir = path.join(buildRoot, ".cmake/api/v1");
   await createApiQuery(apiDir);
 
   // regenerate CMake build directory to acquire CMake file API reply
-  const exitCode = await exec.exec(cmakePath, [ buildRoot ])
+  const exitCode = await exec.exec("cmake", [ buildRoot ])
   if (exitCode != 0) {
     throw new Error(`CMake failed to run with non-zero exit code: ${exitCode}`);
   }
