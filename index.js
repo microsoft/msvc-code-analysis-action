@@ -522,5 +522,5 @@ if (require.main === module) {
         core.setFailed(error)
       }
     }
-  });
+  })();
 }

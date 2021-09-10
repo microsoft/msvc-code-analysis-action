@@ -2365,7 +2365,7 @@ if (require.main === require.cache[eval('__filename')]) {
         core.setFailed(error)
       }
     }
-  });
+  })();
 }
 })();
 
