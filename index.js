@@ -52,8 +52,8 @@ function iterateIfExists(object, property) {
   return object && object.hasOwnProperty(property) ? object[property] : [];
 }
 
-function createSarifFilepath(resultsDir, sourceFile, analyzeIndex) {
-  const filename = `${path.basename(sourceFile)}.${analyzeIndex}.sarif`;
+function createSarifFilepath(resultsDir, source, analyzeIndex) {
+  const filename = `${path.basename(source)}.${analyzeIndex}.sarif`;
   return path.join(resultsDir, filename);
 }
 
@@ -229,9 +229,9 @@ function loadToolchainMap(replyIndexInfo) {
   return toolchainMap;
 }
 
-function CompileCommand(group) {
+function CompileCommand(group, source) {
   // Filepath to source file being compiled
-  this.sourceFile = null;
+  this.source = source;
   // Compiler language used
   this.language = group.language;
   // Compile command line fragments appended into a single string
@@ -272,9 +272,8 @@ function loadCompileCommands(replyIndexInfo) {
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
     for (const group of iterateIfExists(target, 'compileGroups')) {
       for (let sourceIndex of iterateIfExists(group, 'sourceIndexes')) {
-        let compileCommand = new CompileCommand(group);
-        compileCommand.sourceFile = path.join(sourceRoot, target.sources[sourceIndex].path);
-        compileCommands.push(compileCommand);
+        const source = path.join(sourceRoot, target.sources[sourceIndex].path);
+        compileCommands.push(new CompileCommand(group, source));
       }
     }
   }
@@ -413,7 +412,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   let commonArgsMap = {};
   // TODO: don't recompute if toolchains.path are all equal...
   for (const [language, toolchain] of Object.entries(toolchainMap)) {
-    commonArgsMap[language] = getCommonAnalyzeArguments(toolchain);
+    commonArgsMap[language] = getCommonAnalyzeArguments(toolchain.path);
   }
 
   let analyzeCommands = []
@@ -421,8 +420,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
       let args = toolrunner.argStringToArray(command.args);
-      const includes = toolchain.includes.concat(command.includes);
-      for (const include of command.includes) {
+      for (const include of toolchain.includes.concat(command.includes)) {
         if (options.ignoreSystemHeaders && include.isSystem) {
           // TODO: filter compilers that don't support /external.
           args.push(`/external:I${include.path}`);
@@ -435,10 +433,10 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
         args.push(`/D${define}`);
       }
 
-      args.push(command.sourceFile);
+      args.push(command.source);
       args.concat(commonArgsMap[command.language]);
 
-      const sarifLog = createSarifFilepath(resultsDir, command.sourceFile, analyzeCommands.length);
+      const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
       args.push(`/analyze:log${sarifLog}`);
 
       analyzeCommands.push(new AnalyzeCommand(toolchain.path, args));

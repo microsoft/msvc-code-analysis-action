@@ -271,7 +271,7 @@ describe("CMakeApi", () => {
 
         // cmake discoverable and successfully executable
         td.when(io.which("cmake", true)).thenResolve(cmakeExePath);
-        td.when(exec.exec(cmakeExePath, [cmakeBuildDir])).thenResolve(0);
+        td.when(exec.exec("cmake", [cmakeBuildDir])).thenResolve(0);
 
         // default MSVC toolset
         td.when(fs.existsSync(clPath)).thenReturn(true);
@@ -321,7 +321,7 @@ describe("CMakeApi", () => {
         });
 
         it("cmake.exe failed to run", async () => {
-            td.when(exec.exec(cmakeExePath, td.matchers.anything())).thenResolve(1);
+            td.when(exec.exec("cmake", td.matchers.anything())).thenResolve(1);
             await expect(loadCMakeApiReplies(cmakeBuildDir)).to.be.rejectedWith(
                 "CMake failed to run with non-zero exit code: 1");
         });
