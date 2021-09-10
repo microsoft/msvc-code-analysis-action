@@ -231,7 +231,7 @@ describe("CMakeApi", () => {
         for (const command of compileCommands) {
             command.args.should.contain(sharedArgs);
             command.includes.length.should.equal(2);
-            switch (path.basename(command.sourceFile)) {
+            switch (path.basename(command.source)) {
                 case "file1.cpp":
                 case "file3.cxx":
                     command.args.should.contain(uniqueArgs);

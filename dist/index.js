@@ -2180,7 +2180,7 @@ function findRuleset(rulesetDirectory) {
   if (!repoRulesetPath) {
     return undefined;
   } else if (fs.existsSync(repoRulesetPath)) {
-    core.info(`Found ruleset: ${repoRulesetPath}`);
+    core.info(`Found local ruleset: ${repoRulesetPath}`);
     return repoRulesetPath;
   }
 
@@ -2188,7 +2188,6 @@ function findRuleset(rulesetDirectory) {
   const rulesetPath = core.getInput("ruleset");
   if (rulesetDirectory != undefined) {
     const officialRulesetPath = path.join(rulesetDirectory, rulesetPath);
-    core.info(`Looking for ruleset shipped with Visual Studio at: ${rulesetDirectory}`);
     if (fs.existsSync(officialRulesetPath)) {
       core.info(`Found official ruleset: ${officialRulesetPath}`);
       return officialRulesetPath;
@@ -2197,7 +2196,7 @@ function findRuleset(rulesetDirectory) {
     core.warning("Unable to find official rulesets shipped with Visual Studio");
   }
 
-  throw new Error("Unable to fine ruleset specified: " + rulesetPath);
+  throw new Error(`Unable to find local or official ruleset specified: ${rulesetPath}`);
 }
 
 /**
@@ -2242,8 +2241,9 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
   this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
 }
 
-function AnalyzeCommand(command, args) {
-  this.command = command;
+function AnalyzeCommand(source, compiler, args) {
+  this.source = source;
+  this.compiler = compiler;
   this.args = args;
 }
 
@@ -2253,17 +2253,19 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   const compileCommands = loadCompileCommands(replyIndexInfo);
 
   let commonArgsMap = {};
-  // TODO: don't recompute if toolchains.path are all equal...
-  for (const [language, toolchain] of Object.entries(toolchainMap)) {
-    commonArgsMap[language] = getCommonAnalyzeArguments(toolchain.path);
+  for (const toolchain of Object.values(toolchainMap)) {
+    if (!(toolchain.path in commonArgsMap)) {
+      commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path);
+    }
   }
 
   let analyzeCommands = []
   for (const command of compileCommands) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
-      let args = toolrunner.argStringToArray(command.args);
-      for (const include of toolchain.includes.concat(command.includes)) {
+      const args = toolrunner.argStringToArray(command.args);
+      const allIncludes = toolchain.includes.concat(command.includes);
+      for (const include of allIncludes) {
         if (options.ignoreSystemHeaders && include.isSystem) {
           // TODO: filter compilers that don't support /external.
           args.push(`/external:I${include.path}`);
@@ -2277,12 +2279,12 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       }
 
       args.push(command.source);
-      args.concat(commonArgsMap[command.language]);
+      args.concat(commonArgsMap[toolchain.path]);
 
       const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
       args.push(`/analyze:log${sarifLog}`);
 
-      analyzeCommands.push(new AnalyzeCommand(toolchain.path, args));
+      analyzeCommands.push(new AnalyzeCommand(command.source, toolchain.path, args));
     }
   }
 
@@ -2342,17 +2344,28 @@ if (require.main === require.cache[eval('__filename')]) {
 
       // TODO: parallelism
       for (const command of analyzeCommands) {
+        const output = "";
         try {
           const execOptions = {
-            env: { CAEmitSarifLog: 1 }
+            env: { CAEmitSarifLog: 1 },
+            listeners: {
+              stdline: (line) => {
+                output += line;
+              },
+              errline: (line) => {
+                output += line;
+              }
+            }
           };
 
           // TODO: stdout/stderr to log files
           // TODO: timeouts
-          core.info(`Running analysis: ${command.command} ${command.args}`);
-          await exec.exec(command.command, command.args, execOptions);
+          core.info(`Running analysis on: ${command.source}`);
+          core.debug(`'${command.compiler}' ${command.args.join(" ")}`);
+          await exec.exec(command.compiler, command.args, execOptions);
         } catch (err) {
-          core.warning(`Compilation failed for source file.`)
+          core.warning(`Compilation failed with error. Stdout/Stderr:`);
+          core.info(output);
         }
       }
 
