@@ -519,7 +519,7 @@ if (require.main === module) {
           // TODO: timeouts
           core.info(`Running analysis on: ${command.source}`);
           core.debug(`'${command.compiler}' ${command.args.join(" ")}`);
-          await exec.exec(command.compiler, command.args, execOptions);
+          await exec.exec(`'${command.compiler}'`, command.args, execOptions);
         } catch (err) {
           core.warning(`Compilation failed with error. Stdout/Stderr:`);
           core.info(output);
