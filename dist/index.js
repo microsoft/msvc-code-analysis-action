@@ -2347,13 +2347,14 @@ if (require.main === require.cache[eval('__filename')]) {
         const output = "";
         try {
           const execOptions = {
+            cwd: buildDir,
             env: { CAEmitSarifLog: 1 },
             listeners: {
-              stdline: (line) => {
-                output += line;
+              stdout: (data) => {
+                output += data.toString();
               },
-              errline: (line) => {
-                output += line;
+              stderr: (data) => {
+                output += data.toString();
               }
             }
           };
@@ -2364,7 +2365,8 @@ if (require.main === require.cache[eval('__filename')]) {
           core.debug(`'${command.compiler}' ${command.args.join(" ")}`);
           await exec.exec(`'${command.compiler}'`, command.args, execOptions);
         } catch (err) {
-          core.warning(`Compilation failed with error. Stdout/Stderr:`);
+          core.warning(`Compilation failed with error: ${err}`);
+          code.info("Stdout/Stderr:");
           core.info(output);
         }
       }
