@@ -2027,16 +2027,18 @@ async function loadCMakeApiReplies(buildRoot) {
   return replyIndexInfo;
 }
 
+function IncludePath(path, isSystem) {
+  this.path = path;
+  this.isSystem = isSystem;
+}
+
 function ToolchainInfo(toolchain) {
   this.language = toolchain.language;
   this.path = toolchain.compiler.path;
   this.version = toolchain.compiler.version;
   this.includes = [];
   for (const include of toolchain.compiler.implicit.includeDirectories) {
-    this.includes.push({
-      "path": include.path,
-      "isSystem": include.isSystem ? true : false
-    });
+    this.includes.push(new IncludePath(include, true));
   }
 }
 
@@ -2082,14 +2084,13 @@ function CompileCommand(group, source) {
   for (const command of iterateIfExists(group, 'compileCommandFragments')) {
     this.args += ` ${command.fragment}`;
   }
+
   // includes, both regular and system
   this.includes = [];
   for (const include of iterateIfExists(group, 'includes')) {
-    this.includes.push({
-      "path": include.path,
-      "isSystem": include.isSystem ? true : false
-    });
+    this.includes.push(new IncludePath(include.path, include.isSystem ? true : false));
   }
+
   // defines
   this.defines = [];
   for (const define of iterateIfExists(group, 'defines')) {
@@ -2203,7 +2204,7 @@ function findRuleset(rulesetDirectory) {
  * Construct all command-line arguments that will be common among all sources files of a given compiler.
  * @param {*} clPath path to the MSVC compiler
  * @param {CompilerCommandOptions} options options for different compiler features
- * @returns analyze arguments concatenated into a single string.
+ * @returns list of analyze arguments
  */
 function getCommonAnalyzeArguments(clPath, options = {}) {
   const args = [" /analyze:quiet", "/analyze:log:format:sarif"];
@@ -2232,6 +2233,44 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
 }
 
 /**
+ * Extract the the implicit includes that should be used with the given compiler as MSVC
+ * does not populate the Toolchain.implicit.includeDirectories property.
+ * @param {*} path path to the MSVC compiler
+ * @returns array of default includes used by the given MSVC toolset
+ */
+ function extractIncludesFromCompilerPath(compilerPath) {
+   // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
+  const RelativeIncludes = [
+    "..\\..\\..\\include",
+    "..\\..\\..\\ATLMFC\\include"
+  ];
+
+  const implicitIncludes = [];
+  for (const include in RelativeIncludes) {
+    const includePath = path.normalize(path.join(compilerPath, include));
+    implicitIncludes.push(includePath);
+  }
+
+  return implicitIncludes;
+}
+
+/**
+ * Construct all environment variables that will be common among all sources files of a given compiler.
+ * @param {*} clPath path to the MSVC compiler
+ * @param {CompilerCommandOptions} options options for different compiler features
+ * @returns map of environment variables and their values
+ */
+function getCommonAnalyzeEnvironment(clPath, _options = {}) {
+  const implicitIncludes = extractIncludesFromCompilerPath(clPath).join(";");
+  return {
+    CAEmitSarifLog: 1,               // enable compatibility mode as GitHub does not support some sarif options
+    CAExcludePath: implicitIncludes, // exclude all implicit includes
+    INCLUDE: process.env.INCLUDE + ";" + implicitIncludes,
+    PATH: path.dirname(clPath) + ";" + process.env.PATH
+  };
+}
+
+/**
  * Options to enable/disable different compiler features.
  */
  function CompilerCommandOptions() {
@@ -2241,10 +2280,11 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
   this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
 }
 
-function AnalyzeCommand(source, compiler, args) {
+function AnalyzeCommand(source, compiler, args, env) {
   this.source = source;
   this.compiler = compiler;
   this.args = args;
+  this.env = env;
 }
 
 async function createAnalysisCommands(buildRoot, resultsDir, options) {
@@ -2253,9 +2293,11 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   const compileCommands = loadCompileCommands(replyIndexInfo);
 
   let commonArgsMap = {};
+  let commonEnvMap = {};
   for (const toolchain of Object.values(toolchainMap)) {
     if (!(toolchain.path in commonArgsMap)) {
       commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path);
+      commonEnvMap[toolchain.path] = getCommonAnalyzeEnvironment(toolchain.path);
     }
   }
 
@@ -2284,7 +2326,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
       args.push(`/analyze:log${sarifLog}`);
 
-      analyzeCommands.push(new AnalyzeCommand(command.source, toolchain.path, args));
+      analyzeCommands.push(new AnalyzeCommand(command.source, toolchain.path, args, commonEnvMap[toolchain.path]));
     }
   }
 
@@ -2348,7 +2390,7 @@ if (require.main === require.cache[eval('__filename')]) {
         try {
           const execOptions = {
             cwd: buildDir,
-            env: { CAEmitSarifLog: 1 },
+            env: command.env,
             listeners: {
               stdout: (data) => {
                 output += data.toString();
@@ -2362,8 +2404,8 @@ if (require.main === require.cache[eval('__filename')]) {
           // TODO: stdout/stderr to log files
           // TODO: timeouts
           core.info(`Running analysis on: ${command.source}`);
-          core.debug(`'${command.compiler}' ${command.args.join(" ")}`);
-          await exec.exec(`'${command.compiler}'`, command.args, execOptions);
+          core.debug(`cl.exe ${command.args.join(" ")}`);
+          await exec.exec("cl.exe", command.args, execOptions);
         } catch (err) {
           core.warning(`Compilation failed with error: ${err}`);
           code.info("Stdout/Stderr:");
