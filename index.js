@@ -364,7 +364,7 @@ function findRuleset(rulesetDirectory) {
  * @returns list of analyze arguments
  */
 function getCommonAnalyzeArguments(clPath, options) {
-  const args = [" /analyze:quiet", "/analyze:log:format:sarif"];
+  const args = ["/analyze:quiet", "/analyze:log:format:sarif"];
 
   const espXEngine = findEspXEngine(clPath);
   args.push(`/analyze:plugin${espXEngine}`);
