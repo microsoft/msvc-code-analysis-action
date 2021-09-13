@@ -463,7 +463,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   for (const command of compileCommands) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
-      const args = toolrunner.argStringToArray(command.args);
+      let args = toolrunner.argStringToArray(command.args);
       const allIncludes = toolchain.includes.concat(command.includes);
       for (const include of allIncludes) {
         if (options.ignoreSystemHeaders && include.isSystem) {
@@ -479,11 +479,11 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       }
 
       args.push(command.source);
-      args.push(commonArgsMap[toolchain.path]);
 
       const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
       args.push(`/analyze:log${sarifLog}`);
 
+      args = args.concat(commonArgsMap[toolchain.path]);
       analyzeCommands.push(new AnalyzeCommand(command.source, toolchain.path, args, commonEnvMap[toolchain.path]));
     }
   }
