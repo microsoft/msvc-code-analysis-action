@@ -382,7 +382,7 @@ function getCommonAnalyzeArguments(clPath, options) {
     core.warning('Ruleset is not being used, all warnings will be enabled.');
   }
 
-  if (options.useExternalIncludes) {
+  if (options.ignoreSystemHeaders) {
     args.push(`/external:W0`);
     args.push(`/analyze:external-`);
   }
