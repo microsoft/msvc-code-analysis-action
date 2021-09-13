@@ -383,6 +383,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
   }
 
   if (options.useExternalIncludes) {
+    args.push(`/external:W0`);
     args.push(`/analyze:external-`);
   }
 
@@ -566,7 +567,7 @@ if (require.main === module) {
           await exec.exec(`"${command.compiler}"`, command.args, execOptions);
         } catch (err) {
           core.warning(`Compilation failed with error: ${err}`);
-          code.info("Stdout/Stderr:");
+          core.info("Stdout/Stderr:");
           core.info(output);
         }
       }
