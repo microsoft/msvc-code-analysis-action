@@ -2322,7 +2322,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       }
 
       args.push(command.source);
-      args.concat(commonArgsMap[toolchain.path]);
+      args.push(commonArgsMap[toolchain.path]);
 
       const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
       args.push(`/analyze:log${sarifLog}`);
