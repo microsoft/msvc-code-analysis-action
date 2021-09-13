@@ -404,7 +404,7 @@ function getCommonAnalyzeArguments(clPath, options) {
   ];
 
   const implicitIncludes = [];
-  for (const include in RelativeIncludes) {
+  for (const include of RelativeIncludes) {
     const includePath = path.normalize(path.join(compilerPath, include));
     implicitIncludes.push(includePath);
   }
@@ -562,7 +562,8 @@ if (require.main === module) {
           // TODO: stdout/stderr to log files
           // TODO: timeouts
           core.info(`Running analysis on: ${command.source}`);
-          core.debug(`Environment: ${execOptions.env}`);
+          core.debug("Environment:");
+          code.debug(execOptions.env);
           core.debug(`"${command.compiler}" ${command.args.join(" ")}`);
           await exec.exec(`"${command.compiler}"`, command.args, execOptions);
         } catch (err) {
