@@ -2404,8 +2404,9 @@ if (require.main === require.cache[eval('__filename')]) {
           // TODO: stdout/stderr to log files
           // TODO: timeouts
           core.info(`Running analysis on: ${command.source}`);
-          core.debug(`cl.exe ${command.args.join(" ")}`);
-          await exec.exec("cl.exe", command.args, execOptions);
+          core.debug(`Environment: ${execOptions.env}`);
+          core.debug(`"${command.compiler}" ${command.args.join(" ")}`);
+          await exec.exec(`"${command.compiler}"`, command.args, execOptions);
         } catch (err) {
           core.warning(`Compilation failed with error: ${err}`);
           code.info("Stdout/Stderr:");
