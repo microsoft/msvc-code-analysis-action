@@ -563,7 +563,7 @@ if (require.main === module) {
           // TODO: timeouts
           core.info(`Running analysis on: ${command.source}`);
           core.debug("Environment:");
-          code.debug(execOptions.env);
+          core.debug(execOptions.env);
           core.debug(`"${command.compiler}" ${command.args.join(" ")}`);
           await exec.exec(`"${command.compiler}"`, command.args, execOptions);
         } catch (err) {
