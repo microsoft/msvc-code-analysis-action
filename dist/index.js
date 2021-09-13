@@ -2206,7 +2206,7 @@ function findRuleset(rulesetDirectory) {
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns list of analyze arguments
  */
-function getCommonAnalyzeArguments(clPath, options = {}) {
+function getCommonAnalyzeArguments(clPath, options) {
   const args = [" /analyze:quiet", "/analyze:log:format:sarif"];
 
   const espXEngine = findEspXEngine(clPath);
@@ -2261,7 +2261,7 @@ function getCommonAnalyzeArguments(clPath, options = {}) {
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns map of environment variables and their values
  */
-function getCommonAnalyzeEnvironment(clPath, _options = {}) {
+function getCommonAnalyzeEnvironment(clPath, _options) {
   const implicitIncludes = extractIncludesFromCompilerPath(clPath).join(";");
   return {
     CAEmitSarifLog: 1,               // enable compatibility mode as GitHub does not support some sarif options
@@ -2297,8 +2297,8 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   let commonEnvMap = {};
   for (const toolchain of Object.values(toolchainMap)) {
     if (!(toolchain.path in commonArgsMap)) {
-      commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path);
-      commonEnvMap[toolchain.path] = getCommonAnalyzeEnvironment(toolchain.path);
+      commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path, options);
+      commonEnvMap[toolchain.path] = getCommonAnalyzeEnvironment(toolchain.path, options);
     }
   }
 
