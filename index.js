@@ -543,7 +543,7 @@ if (require.main === module) {
 
       // TODO: parallelism
       for (const command of analyzeCommands) {
-        const output = "";
+        let output = "";
         try {
           const execOptions = {
             cwd: buildDir,

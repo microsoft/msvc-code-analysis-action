@@ -2386,7 +2386,7 @@ if (require.main === require.cache[eval('__filename')]) {
 
       // TODO: parallelism
       for (const command of analyzeCommands) {
-        const output = "";
+        let output = "";
         try {
           const execOptions = {
             cwd: buildDir,
