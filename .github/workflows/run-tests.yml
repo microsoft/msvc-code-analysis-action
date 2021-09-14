@@ -52,6 +52,7 @@ jobs:
       with:
         cmakeBuildDirectory: ${{ env.build }}
         resultsDirectory: ${{ env.results }}
+        ruleset: AllRules.ruleset
         ignoreSystemHeaders: true
 
     - name: Upload SARIF artifacts
