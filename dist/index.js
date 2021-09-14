@@ -2266,7 +2266,7 @@ function getCommonAnalyzeEnvironment(clPath, _options) {
   //const includes = process.env.INCLUDE ? process.env.INCLUDE.split(";") : [];
   return {
     CAEmitSarifLog: "1", // enable compatibility mode as GitHub does not support some sarif options
-    CAExcludePath: implicitIncludes.join(";") // exclude all implicit includes
+    //CAExcludePath: implicitIncludes.join(";") // exclude all implicit includes
     //INCLUDE: includes.concat(implicitIncludes).join(";")
   };
 }
