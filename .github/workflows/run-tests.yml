@@ -54,10 +54,11 @@ jobs:
         resultsDirectory: ${{ env.results }}
         ignoreSystemHeaders: true
 
-    # TODO: remove as this as results in sample will not change between PRs
-    - name: Upload SARIF results
-      uses: github/codeql-action/upload-sarif@v1
+    - name: Upload SARIF artifacts
+      uses: actions/upload-artifact@v2
       with:
-        sarif_file: ${{ env.results }}
+        name: sarif-files
+        path: ${{ env.results }}/*
+        if-no-files-found: error
 
     # TODO: Validate SARIF produced
