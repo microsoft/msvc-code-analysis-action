@@ -348,7 +348,7 @@ function findRuleset(rulesetDirectory) {
  * @returns list of analyze arguments
  */
 function getCommonAnalyzeArguments(toolchain, options) {
-  const args = ["/analyze:quiet", "/analyze:log:format:sarif"];
+  const args = ["/analyze:only", "/analyze:quiet", "/analyze:log:format:sarif"];
 
   const espXEngine = findEspXEngine(toolchain);
   args.push(`/analyze:plugin${espXEngine}`);
@@ -443,32 +443,6 @@ function AnalyzeCommand(source, compiler, args, env) {
   this.compiler = compiler;
   this.args = args;
   this.env = env;
-}
-
-// TODO: remove as already handled by cmake?
-function getLanguageStandardArg(command, toolchain) {
-  if (command.standard) {
-    if (command.language == "C" && toolchain.version >= "16.8") {
-      // MSVC currently only supports C11 or C17
-      switch(command.standard) {
-        case "11": return "/std:c11";
-        case "17": return "/std:c17";
-      }
-    } else if (command.language == "CXX") {
-      // MSVC uses std::c++latest until feature complete
-      const supportedVersion = toolchain.version >= "16.11" ? "20" : "17";
-      if (command.standard > supportedVersion) {
-        return "/std:c++latest";
-      }
-      switch(command.standard) {
-        case "14": return "/std:c++14";
-        case "17": return "/std:c++17";
-        case "20": return "/std:c++20";
-      }
-    }
-  }
-
-  return undefined;
 }
 
 async function createAnalysisCommands(buildRoot, resultsDir, options) {

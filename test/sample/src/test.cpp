@@ -10,3 +10,7 @@ void C26815()
         (void)val;
     }
 }
+
+int main() {
+    return 0;
+}
