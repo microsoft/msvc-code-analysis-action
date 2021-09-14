@@ -246,6 +246,8 @@ function CompileCommand(group, source) {
   this.source = source;
   // Compiler language used
   this.language = group.language;
+  // C++ Standard
+  this.standard = group.languageStandard ? group.languageStandard.standard : undefined;
   // Compile command line fragments appended into a single string
   this.args = (group.compileCommandFragments || []).map((c) => c.fragment).join(" ");
   // includes, both regular and system
@@ -441,6 +443,31 @@ function AnalyzeCommand(source, compiler, args, env) {
   this.env = env;
 }
 
+function getLanguageStandardArg(command, toolchain) {
+  if (command.standard) {
+    if (command.language == "C" && toolchain.version >= "16.8") {
+      // MSVC currently only supports C11 or C17
+      switch(command.standard) {
+        case "11": return "/std:c11";
+        case "17": return "/std:c17";
+      }
+    } else if (command.language == "CXX") {
+      // MSVC uses std::c++latest until feature complete
+      const supportedVersion = toolchain.version >= "16.11" ? "20" : "17";
+      if (command.standard > supportedVersion) {
+        args.push("/std:c++latest");
+      }
+      switch(command.standard) {
+        case "14": return "/std:c++14";
+        case "17": return "/std:c++17";
+        case "20": return "/std:c++20";
+      }
+    }
+  }
+
+  return undefined;
+}
+
 async function createAnalysisCommands(buildRoot, resultsDir, options) {
   const replyIndexInfo = await loadCMakeApiReplies(buildRoot);
   const toolchainMap = loadToolchainMap(replyIndexInfo);
@@ -472,6 +499,11 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
 
       for (const define of command.defines) {
         args.push(`/D${define}`);
+      }
+
+      const standardArg = getLanguageStandardArg(command, toolchain);
+      if (standardArg) {
+        args.push(standardArg);
       }
 
       args.push(command.source);
