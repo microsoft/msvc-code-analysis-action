@@ -2262,12 +2262,12 @@ function getCommonAnalyzeArguments(clPath, options) {
  * @returns map of environment variables and their values
  */
 function getCommonAnalyzeEnvironment(clPath, _options) {
-  const implicitIncludes = extractIncludesFromCompilerPath(clPath).join(";");
+  const implicitIncludes = extractIncludesFromCompilerPath(clPath);
+  const includes = process.env.INCLUDE ? process.env.INCLUDE.split(";") : [];
   return {
     CAEmitSarifLog: 1,               // enable compatibility mode as GitHub does not support some sarif options
     CAExcludePath: implicitIncludes, // exclude all implicit includes
-    INCLUDE: process.env.INCLUDE + ";" + implicitIncludes,
-    PATH: path.dirname(clPath) + ";" + process.env.PATH
+    INCLUDE: includes.concat(implicitIncludes).join(";")
   };
 }
 
@@ -2387,32 +2387,20 @@ if (require.main === require.cache[eval('__filename')]) {
 
       // TODO: parallelism
       for (const command of analyzeCommands) {
-        let output = "";
-        try {
-          const execOptions = {
-            cwd: buildDir,
-            env: command.env,
-            listeners: {
-              stdout: (data) => {
-                output += data.toString();
-              },
-              stderr: (data) => {
-                output += data.toString();
-              }
-            }
-          };
+        const execOptions = {
+          cwd: buildDir,
+          env: command.env,
+        };
 
-          // TODO: stdout/stderr to log files
-          // TODO: timeouts
-          core.info(`Running analysis on: ${command.source}`);
-          core.debug("Environment:");
-          core.debug(execOptions.env);
-          core.debug(`"${command.compiler}" ${command.args.join(" ")}`);
+        // TODO: stdout/stderr to log files
+        // TODO: timeouts
+        core.info(`Running analysis on: ${command.source}`);
+        core.debug("Environment:");
+        core.debug(execOptions.env);
+        try {
           await exec.exec(`"${command.compiler}"`, command.args, execOptions);
         } catch (err) {
           core.warning(`Compilation failed with error: ${err}`);
-          core.info("Stdout/Stderr:");
-          core.info(output);
         }
       }
 
