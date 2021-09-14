@@ -19,7 +19,7 @@ const cmakeApiDir = path.join(cmakeBuildDir, path.normalize(".cmake\\api\\v1"));
 const cmakeQueryDir = path.join(cmakeApiDir, "query");
 const cmakeReplyDir = path.join(cmakeApiDir, "reply");
 
-const clPath = "C:/VS/root/Tools/MSVC/14.29.30133/bin/Hostx86/x86/cl.exe";
+const clPath = "C:/VS/root/Tools/MSVC/14.29.30133/bin/HostX86/x86/cl.exe";
 const clInclude = "C:/VS/root/Tools/MSVC/14.29.30133/include";
 
 const PATHEnv = [

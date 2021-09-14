@@ -9,7 +9,9 @@ const toolrunner = require('@actions/exec/lib/toolrunner');
 const util = require('util');
 
 const CMakeApiClientName = "client-msvc-ca-action";
-const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Analysis Tools\\Rule Sets';
+// Paths relative to absolute path to cl.exe
+const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Analysis Tools\\Rule Sets';
+const RelativeCommandPromptPath = '..\\..\\..\\..\\..\\..\\..\\Auxiliary\\Build\\vcvarsall.bat';
 
 /**
  * Validate if the given directory both exists and is non-empty.
@@ -17,6 +19,10 @@ const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Anal
  */
 function isDirectoryEmpty(buildRoot) {
   return !buildRoot || !fs.existsSync(buildRoot) || (fs.readdirSync(buildRoot).length) == 0;
+}
+
+function getRelativeTo(fromPath, relativePath) {
+  return path.normalize(path.join(fromPath, relativePath))
 }
 
 /**
@@ -185,6 +191,20 @@ function ToolchainInfo(toolchain) {
   this.version = toolchain.compiler.version;
   this.includes = (toolchain.compiler.implicit.includeDirectories || []).map(
     (include) => new IncludePath(include, true));
+  // extract host/target arch from folder layout in VS
+  const targetDir = path.dirname(this.path);
+  const hostDir = path.dirname(targetDir);
+  this.targetArch = path.basename(targetDir);
+  switch (path.basename(hostDir)) {
+    case 'HostX86':
+      this.hostArch = 'x86';
+      break;
+    case 'HostX64':
+      this.hostArch = 'x64';
+      break;
+    default:
+      throw new Error('Unknown MSVC toolset layout');
+  }
 }
 
 /**
@@ -265,34 +285,14 @@ function loadCompileCommands(replyIndexInfo) {
  * @param {*} clPath path to the MSVC compiler
  * @returns path to EspXEngine.dll
  */
-function findEspXEngine(clPath) {
-  const clDir = path.dirname(clPath);
-
-  // check if we already have the correct host/target pair
-  let dllPath = path.join(clDir, 'EspXEngine.dll');
-  if (fs.existsSync(dllPath)) {
-    return dllPath;
+function findEspXEngine(toolchain) {
+  const hostDir = path.dirname(path.dirname(toolchain.path));
+  const espXEnginePath = path.join(hostDir, toolchain.hostArch, 'EspXEngine.dll');
+  if (fs.existsSync(espXEnginePath)) {
+    return espXEnginePath;
   }
 
-  let targetName = '';
-  const hostDir = path.dirname(clDir);
-  switch (path.basename(hostDir)) {
-    case 'HostX86':
-      targetName = 'x86';
-      break;
-    case 'HostX64':
-      targetName = 'x64';
-      break;
-    default:
-      throw new Error('Unknown MSVC toolset layout');
-  }
-
-  dllPath = path.join(hostDir, targetName, 'EspXEngine.dll');
-  if (fs.existsSync(dllPath)) {
-    return dllPath;
-  }
-
-  throw new Error('Unable to find EspXEngine.dll');
+  throw new Error(`Unable to find: ${espXEnginePath}`);
 }
 
 /**
@@ -300,8 +300,8 @@ function findEspXEngine(clPath) {
  * @param {*} clPath path to the MSVC compiler
  * @returns path to directory containing all Visual Studio rulesets
  */
-function findRulesetDirectory(clPath) {
-  const rulesetDirectory = path.normalize(path.join(path.dirname(clPath), RelativeRulesetPath));
+function findRulesetDirectory(toolchain) {
+  const rulesetDirectory = getRelativeTo(toolchain.path, RelativeRulesetPath);
   return fs.existsSync(rulesetDirectory) ? rulesetDirectory : undefined;
 }
 
@@ -337,17 +337,17 @@ function findRuleset(rulesetDirectory) {
 
 /**
  * Construct all command-line arguments that will be common among all sources files of a given compiler.
- * @param {*} clPath path to the MSVC compiler
+ * @param {*} toolchain MSVC compiler info
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns list of analyze arguments
  */
-function getCommonAnalyzeArguments(clPath, options) {
+function getCommonAnalyzeArguments(toolchain, options) {
   const args = ["/analyze:quiet", "/analyze:log:format:sarif"];
 
-  const espXEngine = findEspXEngine(clPath);
+  const espXEngine = findEspXEngine(toolchain);
   args.push(`/analyze:plugin${espXEngine}`);
 
-  const rulesetDirectory = findRulesetDirectory(clPath);
+  const rulesetDirectory = findRulesetDirectory(toolchain);
   const rulesetPath = findRuleset(rulesetDirectory);
   if (rulesetPath != undefined) {
     args.push(`/analyze:ruleset${rulesetPath}`);
@@ -371,20 +371,38 @@ function getCommonAnalyzeArguments(clPath, options) {
 /**
  * Extract the the implicit includes that should be used with the given compiler as MSVC
  * does not populate the Toolchain.implicit.includeDirectories property.
- * @param {*} path path to the MSVC compiler
+ * @param {*} toolchain MSVC compiler info
  * @returns array of default includes used by the given MSVC toolset
  */
-function extractIncludesFromCompilerPath(compilerPath) {
-  // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
-  const ToolsetIncludes = [
-    "..\\..\\..\\include",
-    "..\\..\\..\\ATLMFC\\include"
-  ];
+async function extractEnvironmentFromCommandPrompt(toolchain) {
+  const vcEnvScript = path.join(__dirname, "vc_env.bat");
+  const commandPromptPath = getRelativeTo(toolchain.path, RelativeCommandPromptPath);
+  const arch = (toolchain.hostArch == toolchain.targetArch) ? 
+    toolchain.hostArch : `${toolchain.hostArch}_${toolchain.targetArch}`;
 
-  return ToolsetIncludes.map((relativePath) => {
-    const includePath = path.join(path.dirname(compilerPath), relativePath);
-    return path.normalize(includePath);
-  });
+  core.info("Extracting environment from VS Command Prompt");
+  const execOutput = await exec.getExecOutput(vcEnvScript, [commandPromptPath, arch, toolchain.version], options);
+  if (execOutput.exitCode != 0) {
+    throw new Error("Failed to run VS Command Prompt to collect implicit includes/libs");
+  }
+
+  core.debug(execOutput.stdout);
+  const env = {
+    "INCLUDE": "",
+    "LIB": ""
+  };
+  for (const line of execOutput.stdout.split(/\r?\n/)) {
+    const index = line.indexOf('=');
+    if (index != -1) {
+      core.debug(line);
+      const envVar = line.substring(0, index);
+      if (envVar in env) {
+        env[envVar] = line.substring(index + 1, 0);
+      }
+    }
+  }
+
+  return env;
 }
 
 /**
@@ -393,13 +411,13 @@ function extractIncludesFromCompilerPath(compilerPath) {
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns map of environment variables and their values
  */
-function getCommonAnalyzeEnvironment(clPath, _options) {
-  const existingIncludes = process.env.INCLUDE || "";
-  const implicitIncludes = extractIncludesFromCompilerPath(clPath).join(";");
+async function getCommonAnalyzeEnvironment(toolchain, _options) {
+  const commandPromptEnv = await extractEnvironmentFromCommandPrompt(toolchain);
   return {
     CAEmitSarifLog: "1", // enable compatibility mode as GitHub does not support some sarif options
-    CAExcludePath: implicitIncludes, // exclude all implicit includes
-    INCLUDE: `${existingIncludes};${implicitIncludes}`
+    CAExcludePath: `${process.env.CAExcludePath || ""};${commandPromptEnv.INCLUDE}`, // exclude all implicit includes
+    INCLUDE: `${process.env.INCLUDE || ""};${commandPromptEnv.INCLUDE}`,
+    LIB: `${process.env.LIB || ""};${commandPromptEnv.LIB}`,
   };
 }
 
@@ -430,7 +448,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   for (const toolchain of Object.values(toolchainMap)) {
     if (!(toolchain.path in commonArgsMap)) {
       commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path, options);
-      commonEnvMap[toolchain.path] = getCommonAnalyzeEnvironment(toolchain.path, options);
+      commonEnvMap[toolchain.path] = await getCommonAnalyzeEnvironment(toolchain.path, options);
     }
   }
 
