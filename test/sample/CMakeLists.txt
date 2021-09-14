@@ -1,8 +1,17 @@
 cmake_minimum_required (VERSION 3.20.5)
 project (Sample)
 
-set(PROPERTY CXX_STANDARD 20)
+add_library (${PROJECT_NAME}
+  src/test.cpp)
 
-add_library (Sample src/test.cpp)
+set_target_properties(${PROJECT_NAME}
+  PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
-target_include_directories (Sample SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories (${PROJECT_NAME}
+  SYSTEM PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)

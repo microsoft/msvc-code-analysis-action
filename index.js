@@ -445,6 +445,7 @@ function AnalyzeCommand(source, compiler, args, env) {
   this.env = env;
 }
 
+// TODO: remove as already handled by cmake?
 function getLanguageStandardArg(command, toolchain) {
   if (command.standard) {
     if (command.language == "C" && toolchain.version >= "16.8") {
@@ -501,12 +502,6 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
 
       for (const define of command.defines) {
         args.push(`/D${define}`);
-      }
-
-      const standardArg = getLanguageStandardArg(command, toolchain);
-      core.debug(`langStd: ${standardArg}`);
-      if (standardArg) {
-        args.push(standardArg);
       }
 
       args.push(command.source);
