@@ -11,6 +11,7 @@ const util = require('util');
 const CMakeApiClientName = "client-msvc-ca-action";
 // Paths relative to absolute path to cl.exe
 const RelativeRulesetPath = '..\\..\\..\\..\\..\\..\\..\\..\\Team Tools\\Static Analysis Tools\\Rule Sets';
+const RelativeToolsetPath = '..\\..\\..\\..';
 const RelativeCommandPromptPath = '..\\..\\..\\..\\..\\..\\..\\Auxiliary\\Build\\vcvarsall.bat';
 
 /**
@@ -191,7 +192,8 @@ function ToolchainInfo(toolchain) {
   this.version = toolchain.compiler.version;
   this.includes = (toolchain.compiler.implicit.includeDirectories || []).map(
     (include) => new IncludePath(include, true));
-  // extract host/target arch from folder layout in VS
+  // extract toolset-version & host/target arch from folder layout in VS
+  this.toolsetVersion = path.basename(getRelativeTo(this.path, RelativeToolsetPath));
   const targetDir = path.dirname(this.path);
   const hostDir = path.dirname(targetDir);
   this.targetArch = path.basename(targetDir);
@@ -381,7 +383,8 @@ async function extractEnvironmentFromCommandPrompt(toolchain) {
     toolchain.hostArch : `${toolchain.hostArch}_${toolchain.targetArch}`;
 
   core.info("Extracting environment from VS Command Prompt");
-  const execOutput = await exec.getExecOutput(vcEnvScript, [commandPromptPath, arch, toolchain.version]);
+  const execOutput = await exec.getExecOutput(vcEnvScript,
+    [commandPromptPath, arch, toolchain.toolsetVersion]);
   if (execOutput.exitCode != 0) {
     throw new Error("Failed to run VS Command Prompt to collect implicit includes/libs");
   }
