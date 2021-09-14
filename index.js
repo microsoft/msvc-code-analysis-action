@@ -196,10 +196,10 @@ function ToolchainInfo(toolchain) {
   const hostDir = path.dirname(targetDir);
   this.targetArch = path.basename(targetDir);
   switch (path.basename(hostDir)) {
-    case 'HostX86':
+    case 'Hostx86':
       this.hostArch = 'x86';
       break;
-    case 'HostX64':
+    case 'Hostx64':
       this.hostArch = 'x64';
       break;
     default:
