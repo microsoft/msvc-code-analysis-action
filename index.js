@@ -42,16 +42,6 @@ function resolveInputPath(input, required = false) {
   return inputPath;
 }
 
-/**
- * Helper for iterating over object properties that may not exist
- * @param {*} object object with given optional property
- * @param {*} property property name
- * @returns iterable if exists, otherwise empty array.
- */
-function iterateIfExists(object, property) {
-  return object && object.hasOwnProperty(property) ? object[property] : [];
-}
-
 function createSarifFilepath(resultsDir, source, analyzeIndex) {
   const filename = `${path.basename(source)}.${analyzeIndex}.sarif`;
   return path.join(resultsDir, filename);
@@ -189,36 +179,12 @@ function IncludePath(path, isSystem) {
   this.isSystem = isSystem;
 }
 
-/**
- * Extract the the implicit includes that should be used with the given compiler as MSVC
- * does not populate the Toolchain.implicit.includeDirectories property.
- * @param {*} path path to the MSVC compiler
- * @returns array of default includes used by the given MSVC toolset
- */
-function extractIncludesFromCompilerPath(compilerPath) {
-  // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
- const RelativeIncludes = [
-   "..\\..\\..\\include",
-   "..\\..\\..\\ATLMFC\\include"
- ];
-
- const implicitIncludes = [];
- for (const include of RelativeIncludes) {
-   const includePath = path.normalize(path.join(compilerPath, include));
-   implicitIncludes.push(new IncludePath(includePath, true));
- }
-
- return implicitIncludes;
-}
-
 function ToolchainInfo(toolchain) {
   this.language = toolchain.language;
   this.path = toolchain.compiler.path;
   this.version = toolchain.compiler.version;
-  this.includes = extractIncludesFromCompilerPath(toolchain.compiler.path);
-  for (const include of toolchain.compiler.implicit.includeDirectories) {
-    this.includes.push(new IncludePath(include, true));
-  }
+  this.includes = (toolchain.compiler.implicit.includeDirectories || []).map(
+    (include) => new IncludePath(include, true));
 }
 
 /**
@@ -259,22 +225,12 @@ function CompileCommand(group, source) {
   // Compiler language used
   this.language = group.language;
   // Compile command line fragments appended into a single string
-  this.args = "";
-  for (const command of iterateIfExists(group, 'compileCommandFragments')) {
-    this.args += ` ${command.fragment}`;
-  }
-
+  this.args = (group.compileCommandFragments || []).map((c) => c.fragment).join(" ");
   // includes, both regular and system
-  this.includes = [];
-  for (const include of iterateIfExists(group, 'includes')) {
-    this.includes.push(new IncludePath(include.path, include.isSystem ? true : false));
-  }
-
+  this.includes = (group.includes || []).map((inc) =>
+    new IncludePath(inc.path, inc.isSystem || false));
   // defines
-  this.defines = [];
-  for (const define of iterateIfExists(group, 'defines')) {
-    this.defines.push(define.define);
-  }
+  this.defines = (group.defines || []).map((d) => d.define);
 }
 
 /**
@@ -291,10 +247,10 @@ function loadCompileCommands(replyIndexInfo) {
   const codemodel = parseReplyFile(replyIndexInfo.codemodelResponseFile);
   const sourceRoot = codemodel.paths.source;
   const replyDir = path.dirname(replyIndexInfo.codemodelResponseFile);
-  for (const targetInfo of iterateIfExists(codemodel.configurations[0], 'targets')) {
+  for (const targetInfo of codemodel.configurations[0].targets) {
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
-    for (const group of iterateIfExists(target, 'compileGroups')) {
-      for (let sourceIndex of iterateIfExists(group, 'sourceIndexes')) {
+    for (const group of target.compileGroups || []) {
+      for (const sourceIndex of group.sourceIndexes) {
         const source = path.join(sourceRoot, target.sources[sourceIndex].path);
         compileCommands.push(new CompileCommand(group, source));
       }
@@ -413,18 +369,37 @@ function getCommonAnalyzeArguments(clPath, options) {
 }
 
 /**
+ * Extract the the implicit includes that should be used with the given compiler as MSVC
+ * does not populate the Toolchain.implicit.includeDirectories property.
+ * @param {*} path path to the MSVC compiler
+ * @returns array of default includes used by the given MSVC toolset
+ */
+function extractIncludesFromCompilerPath(compilerPath) {
+  // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
+  const ToolsetIncludes = [
+    "..\\..\\..\\include",
+    "..\\..\\..\\ATLMFC\\include"
+  ];
+
+  return ToolsetIncludes.map((relativePath) => {
+    const includePath = path.join(path.dirname(compilerPath), relativePath);
+    return path.normalize(includePath);
+  });
+}
+
+/**
  * Construct all environment variables that will be common among all sources files of a given compiler.
  * @param {*} clPath path to the MSVC compiler
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns map of environment variables and their values
  */
 function getCommonAnalyzeEnvironment(clPath, _options) {
-  //const implicitIncludes = extractIncludesFromCompilerPath(clPath);
-  //const includes = process.env.INCLUDE ? process.env.INCLUDE.split(";") : [];
+  const existingIncludes = process.env.INCLUDE || "";
+  const implicitIncludes = extractIncludesFromCompilerPath(clPath).join(";");
   return {
     CAEmitSarifLog: "1", // enable compatibility mode as GitHub does not support some sarif options
-    //CAExcludePath: implicitIncludes.join(";") // exclude all implicit includes
-    //INCLUDE: includes.concat(implicitIncludes).join(";")
+    CAExcludePath: implicitIncludes, // exclude all implicit includes
+    INCLUDE: `${existingIncludes};${implicitIncludes}`
   };
 }
 
@@ -496,7 +471,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
  * @returns the absolute path to the 'results' directory for SARIF files.
  */
  function prepareResultsDir() {
-  const  resultsDir = resolveInputPath("resultsDirectory", true);
+  const resultsDir = resolveInputPath("resultsDirectory", true);
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir, { recursive: true }, err => {
       if (err) {
