@@ -381,7 +381,7 @@ async function extractEnvironmentFromCommandPrompt(toolchain) {
     toolchain.hostArch : `${toolchain.hostArch}_${toolchain.targetArch}`;
 
   core.info("Extracting environment from VS Command Prompt");
-  const execOutput = await exec.getExecOutput(vcEnvScript, [commandPromptPath, arch, toolchain.version], options);
+  const execOutput = await exec.getExecOutput(vcEnvScript, [commandPromptPath, arch, toolchain.version]);
   if (execOutput.exitCode != 0) {
     throw new Error("Failed to run VS Command Prompt to collect implicit includes/libs");
   }
