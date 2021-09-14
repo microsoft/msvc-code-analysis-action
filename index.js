@@ -189,11 +189,33 @@ function IncludePath(path, isSystem) {
   this.isSystem = isSystem;
 }
 
+/**
+ * Extract the the implicit includes that should be used with the given compiler as MSVC
+ * does not populate the Toolchain.implicit.includeDirectories property.
+ * @param {*} path path to the MSVC compiler
+ * @returns array of default includes used by the given MSVC toolset
+ */
+function extractIncludesFromCompilerPath(compilerPath) {
+  // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
+ const RelativeIncludes = [
+   "..\\..\\..\\include",
+   "..\\..\\..\\ATLMFC\\include"
+ ];
+
+ const implicitIncludes = [];
+ for (const include of RelativeIncludes) {
+   const includePath = path.normalize(path.join(compilerPath, include));
+   implicitIncludes.push(new IncludePath(includePath, true));
+ }
+
+ return implicitIncludes;
+}
+
 function ToolchainInfo(toolchain) {
   this.language = toolchain.language;
   this.path = toolchain.compiler.path;
   this.version = toolchain.compiler.version;
-  this.includes = [];
+  this.includes = extractIncludesFromCompilerPath(toolchain.compiler.path);
   for (const include of toolchain.compiler.implicit.includeDirectories) {
     this.includes.push(new IncludePath(include, true));
   }
@@ -391,40 +413,18 @@ function getCommonAnalyzeArguments(clPath, options) {
 }
 
 /**
- * Extract the the implicit includes that should be used with the given compiler as MSVC
- * does not populate the Toolchain.implicit.includeDirectories property.
- * @param {*} path path to the MSVC compiler
- * @returns array of default includes used by the given MSVC toolset
- */
- function extractIncludesFromCompilerPath(compilerPath) {
-   // TODO: run vcvarsXXX.bat and extract includes/libs as we are missing windows SDK.
-  const RelativeIncludes = [
-    "..\\..\\..\\include",
-    "..\\..\\..\\ATLMFC\\include"
-  ];
-
-  const implicitIncludes = [];
-  for (const include of RelativeIncludes) {
-    const includePath = path.normalize(path.join(compilerPath, include));
-    implicitIncludes.push(includePath);
-  }
-
-  return implicitIncludes;
-}
-
-/**
  * Construct all environment variables that will be common among all sources files of a given compiler.
  * @param {*} clPath path to the MSVC compiler
  * @param {CompilerCommandOptions} options options for different compiler features
  * @returns map of environment variables and their values
  */
 function getCommonAnalyzeEnvironment(clPath, _options) {
-  const implicitIncludes = extractIncludesFromCompilerPath(clPath);
-  const includes = process.env.INCLUDE ? process.env.INCLUDE.split(";") : [];
+  //const implicitIncludes = extractIncludesFromCompilerPath(clPath);
+  //const includes = process.env.INCLUDE ? process.env.INCLUDE.split(";") : [];
   return {
     CAEmitSarifLog: "1", // enable compatibility mode as GitHub does not support some sarif options
-    CAExcludePath: implicitIncludes.join(";"), // exclude all implicit includes
-    INCLUDE: includes.concat(implicitIncludes).join(";")
+    CAExcludePath: implicitIncludes.join(";") // exclude all implicit includes
+    //INCLUDE: includes.concat(implicitIncludes).join(";")
   };
 }
 
