@@ -273,6 +273,8 @@ function loadCompileCommands(replyIndexInfo) {
   const replyDir = path.dirname(replyIndexInfo.codemodelResponseFile);
   for (const targetInfo of codemodel.configurations[0].targets) {
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
+    core.debug("Target file:");
+    core.debug(standardArg);
     for (const group of target.compileGroups || []) {
       for (const sourceIndex of group.sourceIndexes) {
         const source = path.join(sourceRoot, target.sources[sourceIndex].path);
@@ -455,7 +457,7 @@ function getLanguageStandardArg(command, toolchain) {
       // MSVC uses std::c++latest until feature complete
       const supportedVersion = toolchain.version >= "16.11" ? "20" : "17";
       if (command.standard > supportedVersion) {
-        args.push("/std:c++latest");
+        return "/std:c++latest";
       }
       switch(command.standard) {
         case "14": return "/std:c++14";
@@ -502,6 +504,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       }
 
       const standardArg = getLanguageStandardArg(command, toolchain);
+      core.debug(`langStd: ${standardArg}`);
       if (standardArg) {
         args.push(standardArg);
       }
