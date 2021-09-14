@@ -274,7 +274,7 @@ function loadCompileCommands(replyIndexInfo) {
   for (const targetInfo of codemodel.configurations[0].targets) {
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
     core.debug("Target file:");
-    core.debug(standardArg);
+    core.debug(target);
     for (const group of target.compileGroups || []) {
       for (const sourceIndex of group.sourceIndexes) {
         const source = path.join(sourceRoot, target.sources[sourceIndex].path);
