@@ -2290,8 +2290,8 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
   let commonEnvMap = {};
   for (const toolchain of Object.values(toolchainMap)) {
     if (!(toolchain.path in commonArgsMap)) {
-      commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain.path, options);
-      commonEnvMap[toolchain.path] = await getCommonAnalyzeEnvironment(toolchain.path, options);
+      commonArgsMap[toolchain.path] = getCommonAnalyzeArguments(toolchain, options);
+      commonEnvMap[toolchain.path] = await getCommonAnalyzeEnvironment(toolchain, options);
     }
   }
 
