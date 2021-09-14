@@ -61,5 +61,3 @@ jobs:
         name: sarif-files
         path: ${{ env.results }}/*
         if-no-files-found: error
-
-    # TODO: Validate SARIF produced

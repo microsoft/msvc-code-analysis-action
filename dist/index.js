@@ -1849,7 +1849,6 @@ const fs = __nccwpck_require__(747);
 const io = __nccwpck_require__(958);
 const path = __nccwpck_require__(622);
 const toolrunner = __nccwpck_require__(174);
-const util = __nccwpck_require__(669);
 
 const CMakeApiClientName = "client-msvc-ca-action";
 // Paths relative to absolute path to cl.exe
@@ -1865,6 +1864,12 @@ function isDirectoryEmpty(buildRoot) {
   return !buildRoot || !fs.existsSync(buildRoot) || (fs.readdirSync(buildRoot).length) == 0;
 }
 
+/**
+ * Get normalized relative path from a given file/directory.
+ * @param {string} fromPath path to join relative path to
+ * @param {string} relativePath relative path to append
+ * @returns normalized path
+ */
 function getRelativeTo(fromPath, relativePath) {
   return path.normalize(path.join(fromPath, relativePath))
 }
@@ -1872,9 +1877,9 @@ function getRelativeTo(fromPath, relativePath) {
 /**
  * Validate and resolve action input path by making non-absolute paths relative to
  * GitHub repository root.
- * @param {*} input name of GitHub action input variable
- * @param {*} required if true the input must be non-empty
- * @returns the absolute path to the input path if specified.
+ * @param {string} input name of GitHub action input variable
+ * @param {boolean} required if true the input must be non-empty
+ * @returns the absolute path to the input path if specified
  */
 function resolveInputPath(input, required = false) {
   let inputPath = core.getInput(input);
@@ -1892,14 +1897,9 @@ function resolveInputPath(input, required = false) {
   return inputPath;
 }
 
-function createSarifFilepath(resultsDir, source, analyzeIndex) {
-  const filename = `${path.basename(source)}.${analyzeIndex}.sarif`;
-  return path.join(resultsDir, filename);
-}
-
 /**
  * Create a query file for the CMake API
- * @param {*} apiDir CMake API directory '.cmake/api/v1', will be creating if non-existent
+ * @param {string} apiDir CMake API directory '.cmake/api/v1'
  */
 async function createApiQuery(apiDir) {
   const queryDir = path.join(apiDir, "query", CMakeApiClientName);
@@ -1910,7 +1910,6 @@ async function createApiQuery(apiDir) {
   const queryFile = path.join(queryDir, "query.json");
   const queryData = {
     "requests": [
-      { kind: "cache", version: 2 },
       { kind: "codemodel", version: 2 },
       { kind: "toolchains", version: 1 }
   ]};
@@ -1923,9 +1922,9 @@ async function createApiQuery(apiDir) {
 }
 
 /**
- * Read and parse json reply file
- * @param {*} replyFile Absolute path to json reply
- * @returns Parsed json data of the reply file
+ * Read and parse the given JSON reply file.
+ * @param {string} replyFile absolute path to JSON reply
+ * @returns parsed JSON data of the reply file
  */
 function parseReplyFile(replyFile) {
   if (!fs.existsSync(replyFile)) {
@@ -1941,23 +1940,34 @@ function parseReplyFile(replyFile) {
   return JSON.parse(jsonData);
 }
 
-function getResponseFilepath(replyDir, indexReply, kind) {
-  const clientResponses = indexReply.reply[CMakeApiClientName]["query.json"].responses;
+/**
+ * Get the JSON filepath for the given response kind.
+ * @param {string} replyDir CMake API directory for replies '.cmake/api/v1/reply'
+ * @param {object} indexReply parsed JSON data from index-xxx.json reply
+ * @param {string} kind the kind of response to search for
+ * @returns the absolute path to the JSON response file, null if not found
+ */
+function getResponseFilepath(replyDir, clientResponses, kind) {
   const response = clientResponses.find((response) => response["kind"] == kind);
   return response ? path.join(replyDir, response.jsonFile) : null;
 }
 
+/**
+ * Information extracted from CMake API index reply which details all other requested responses.
+ * @param {string} replyDir CMake API directory for replies '.cmake/api/v1/reply'
+ * @param {object} indexReply parsed JSON data from index-xxx.json reply
+ */
 function ReplyIndexInfo(replyDir, indexReply) {
+  const clientResponses = indexReply.reply[CMakeApiClientName]["query.json"].responses;
+  this.codemodelResponseFile = getResponseFilepath(replyDir, clientResponses, "codemodel");
+  this.toolchainsResponseFile = getResponseFilepath(replyDir, clientResponses, "toolchains");
   this.version = indexReply.cmake.version.string;
-  this.cacheResponseFile = getResponseFilepath(replyDir, indexReply, "cache");
-  this.codemodelResponseFile = getResponseFilepath(replyDir, indexReply, "codemodel");
-  this.toolchainsResponseFile = getResponseFilepath(replyDir, indexReply, "toolchains");
 }
 
 /**
  * Load the information needed from the reply index file for the CMake API
- * @param {*} apiDir CMake API directory '.cmake/api/v1'
- * @returns ReplyIndexInfo info extracted from json
+ * @param {string} apiDir CMake API directory '.cmake/api/v1'
+ * @returns ReplyIndexInfo info extracted from index-xxx.json reply
  */
 function getApiReplyIndex(apiDir) {
   const replyDir = path.join(apiDir, "reply");
@@ -1966,7 +1976,7 @@ function getApiReplyIndex(apiDir) {
   if (fs.existsSync(replyDir)) {
     for (const filename of fs.readdirSync(replyDir)) {
       if (filename.startsWith("index-")) {
-        // Get the most recent index query file (ordered lexicographically)
+        // get the most recent index query file (ordered lexicographically)
         const filepath = path.join(replyDir, filename);
         if (!indexFilepath || filepath > indexFilepath) {
           indexFilepath = filepath;
@@ -1982,37 +1992,38 @@ function getApiReplyIndex(apiDir) {
   const indexReply = parseReplyFile(indexFilepath);
   const replyIndexInfo = new ReplyIndexInfo(replyDir, indexReply);
 
-  core.info(`Loaded index reply with CMake version ${indexReply.cmake.version.string}`);
+  core.info(`Loaded '${indexFilepath}' reply generated from CMake API.`);
 
   return replyIndexInfo;
 }
 
 /**
-   * Create a query to the CMake API of an existing already configured CMake project. This will:
-   *  - Read existing default reply data to find CMake
-   *  - Create a query file for all data needed
-   *  - Re-run CMake config to generated reply data
-   *  - TODO: ...
-   * 
-   * loadApi is required to call any other methods on this class.
-   * @param {*} buildRoot directory of CMake build
+   * Load reply data from the CMake API. This will:
+   *  - Create a query file in cmake API directory requesting data needed
+   *  - Re-run CMake on build directory to generate reply data
+   *  - Extract required information from the index-xxx.json reply
+   *  - Validate the version of CMake to ensure required reply data exists
+   * @param {string} buildRoot build directory of CMake project
+   * @return ReplyIndexInfo info extracted from index-xxx.json reply
    */
 async function loadCMakeApiReplies(buildRoot) {
   if (isDirectoryEmpty(buildRoot)) {
     throw new Error("CMake build root must exist, be non-empty and be configured with CMake");
   }
 
-  // validate CMake is findable on the path
+  // validate CMake can be found on the PATH
   await io.which("cmake", true);
 
-  // create CMake api query file for the generation of replies needed
+  // create CMake API query file for the generation of replies needed
   const apiDir = path.join(buildRoot, ".cmake/api/v1");
   await createApiQuery(apiDir);
 
   // regenerate CMake build directory to acquire CMake file API reply
-  const exitCode = await exec.exec("cmake", [ buildRoot ])
-  if (exitCode != 0) {
-    throw new Error(`CMake failed to run with non-zero exit code: ${exitCode}`);
+  core.info(`Running CMake to generate reply data.`);
+  try {
+    await exec.exec("cmake", [ buildRoot ])
+  } catch (err) {
+    throw new Error(`CMake failed to reconfigure project with error: ${err}`);
   }
 
   // load reply index generated from the CMake Api
@@ -2024,17 +2035,27 @@ async function loadCMakeApiReplies(buildRoot) {
   return replyIndexInfo;
 }
 
+/**
+ * Information on compiler include path.
+ * @param {string} path the absolute path to the include directory
+ * @param {boolean} isSystem true if this should be treated as a CMake SYSTEM path
+ */
 function IncludePath(path, isSystem) {
   this.path = path;
   this.isSystem = isSystem;
 }
 
+/**
+ * Information about the language and compiler being used to compile a source file.
+ * @param {object} toolchain ReplyIndexInfo info extracted from index-xxx.json reply
+ */
 function ToolchainInfo(toolchain) {
   this.language = toolchain.language;
   this.path = toolchain.compiler.path;
   this.version = toolchain.compiler.version;
   this.includes = (toolchain.compiler.implicit.includeDirectories || []).map(
     (include) => new IncludePath(include, true));
+
   // extract toolset-version & host/target arch from folder layout in VS
   this.toolsetVersion = path.basename(getRelativeTo(this.path, RelativeToolsetPath));
   const targetDir = path.dirname(this.path);
@@ -2053,9 +2074,10 @@ function ToolchainInfo(toolchain) {
 }
 
 /**
- * 
- * @param {*} replyIndexInfo 
- * @returns 
+ * Parse the toolchain-xxx.json file to find information on any MSVC toolchains used. If none are
+ * found issue an error.
+ * @param {ReplyIndexInfo} replyIndexInfo ReplyIndexInfo info extracted from index-xxx.json reply
+ * @returns Toolchain info extracted from toolchain-xxx.json
  */
 function loadToolchainMap(replyIndexInfo) {
   if (!fs.existsSync(replyIndexInfo.toolchainsResponseFile)) {
@@ -2084,6 +2106,11 @@ function loadToolchainMap(replyIndexInfo) {
   return toolchainMap;
 }
 
+/**
+ * Information on each compilation unit extracted from the CMake targets.
+ * @param {object} group compilation data shared between one or more source files
+ * @param {string} source absolute path to source file being compiled
+ */
 function CompileCommand(group, source) {
   // Filepath to source file being compiled
   this.source = source;
@@ -2101,9 +2128,10 @@ function CompileCommand(group, source) {
 }
 
 /**
- * 
- * @param {*} replyIndexInfo 
- * @returns 
+ * Parse the codemodel-xxx.json and each target-xxx.json to find information on required to compile
+ * each source file in the project.
+ * @param {ReplyIndexInfo} replyIndexInfo ReplyIndexInfo info extracted from index-xxx.json reply
+ * @returns CompileCommand information for each compiled source file in the project
  */
 function loadCompileCommands(replyIndexInfo) {
   if (!fs.existsSync(replyIndexInfo.codemodelResponseFile)) {
@@ -2128,9 +2156,9 @@ function loadCompileCommands(replyIndexInfo) {
 }
 
 /**
- * Find EspXEngine.dll as it only exists in host/target bin for MSVC Visual Studio release.
- * @param {*} clPath path to the MSVC compiler
- * @returns path to EspXEngine.dll
+ * Find path to  EspXEngine.dll as it only exists in host/target bin for MSVC Visual Studio release.
+ * @param {ToolchainInfo} toolchain information on the toolchain being used
+ * @returns absolute path to EspXEngine.dll
  */
 function findEspXEngine(toolchain) {
   const hostDir = path.dirname(path.dirname(toolchain.path));
@@ -2144,8 +2172,8 @@ function findEspXEngine(toolchain) {
 
 /**
  * Find official ruleset directory using the known path of MSVC compiler in Visual Studio.
- * @param {*} clPath path to the MSVC compiler
- * @returns path to directory containing all Visual Studio rulesets
+ * @param {ToolchainInfo} toolchain information on the toolchain being used
+ * @returns absolute path to directory containing all Visual Studio rulesets
  */
 function findRulesetDirectory(toolchain) {
   const rulesetDirectory = getRelativeTo(toolchain.path, RelativeRulesetPath);
@@ -2155,7 +2183,7 @@ function findRulesetDirectory(toolchain) {
 /**
  * Find ruleset first searching relative to GitHub repository and then relative to the official ruleset directory
  * shipped in Visual Studio.
- * @param {*} rulesetDirectory path to directory containing all Visual Studio rulesets
+ * @param {string} rulesetDirectory path to directory containing all Visual Studio rulesets
  * @returns path to ruleset found locally or inside Visual Studio
  */
 function findRuleset(rulesetDirectory) {
@@ -2176,17 +2204,29 @@ function findRuleset(rulesetDirectory) {
       return officialRulesetPath;
     }
   } else {
-    core.warning("Unable to find official rulesets shipped with Visual Studio");
+    core.warning("Unable to find official rulesets shipped with Visual Studio.");
   }
 
   throw new Error(`Unable to find local or official ruleset specified: ${rulesetPath}`);
 }
 
 /**
+ * Options to enable/disable different compiler features.
+ */
+ function CompilerCommandOptions() {
+  // Use /external command line options to ignore warnings in CMake SYSTEM headers.
+  this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
+  // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
+  this.loadImplicitCompilerEnv = core.getInput("loadImplicitCompilerEnv");
+  // TODO: add support to build precompiled headers before running analysis.
+  this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
+}
+
+/**
  * Construct all command-line arguments that will be common among all sources files of a given compiler.
- * @param {*} toolchain MSVC compiler info
+ * @param {*} toolchain information on the toolchain being used
  * @param {CompilerCommandOptions} options options for different compiler features
- * @returns list of analyze arguments
+ * @returns list of analyze arguments common to the given toolchain
  */
 function getCommonAnalyzeArguments(toolchain, options) {
   const args = ["/analyze:only", "/analyze:quiet", "/analyze:log:format:sarif"];
@@ -2216,13 +2256,16 @@ function getCommonAnalyzeArguments(toolchain, options) {
 }
 
 /**
- * Extract the the implicit includes that should be used with the given compiler as MSVC
- * does not populate the Toolchain.implicit.includeDirectories property.
- * @param {*} toolchain MSVC compiler info
+ * Extract the the implicit includes that should be used with the given compiler from the
+ * Visual Studio command prompt corresponding with the toolchain used. This is required
+ * as MSVC does not populate the CMake API `toolchain.implicit.includeDirectories` property.
+ * @param {ToolchainInfo} toolchain information on the toolchain being used
  * @returns array of default includes used by the given MSVC toolset
  */
 async function extractEnvironmentFromCommandPrompt(toolchain) {
+  // use bat file to output environment variable required after running 'vcvarsall.bat' 
   const vcEnvScript = path.join(__dirname, "vc_env.bat");
+  // init arguments for 'vcvarsall.bat' to match the toolset version/arch used
   const commandPromptPath = getRelativeTo(toolchain.path, RelativeCommandPromptPath);
   const arch = (toolchain.hostArch == toolchain.targetArch) ? 
     toolchain.hostArch : `${toolchain.hostArch}_${toolchain.targetArch}`;
@@ -2232,14 +2275,11 @@ async function extractEnvironmentFromCommandPrompt(toolchain) {
   const execOutput = await exec.getExecOutput(vcEnvScript,
     [commandPromptPath, arch, toolchain.toolsetVersion], execOptions);
   if (execOutput.exitCode != 0) {
+    core.debug(execOutput.stdout);
     throw new Error("Failed to run VS Command Prompt to collect implicit includes/libs");
   }
 
-  core.debug(execOutput.stdout);
-  const env = {
-    "INCLUDE": "",
-    "LIB": ""
-  };
+  const env = { INCLUDE: "", LIB: "" };
   for (const line of execOutput.stdout.split(/\r?\n/)) {
     const index = line.indexOf('=');
     if (index != -1) {
@@ -2255,30 +2295,35 @@ async function extractEnvironmentFromCommandPrompt(toolchain) {
 
 /**
  * Construct all environment variables that will be common among all sources files of a given compiler.
- * @param {*} clPath path to the MSVC compiler
+ * @param {ToolchainInfo} toolchain information on the toolchain being used
  * @param {CompilerCommandOptions} options options for different compiler features
- * @returns map of environment variables and their values
+ * @returns map of environment variables common to the given toolchain
  */
-async function getCommonAnalyzeEnvironment(toolchain, _options) {
-  const commandPromptEnv = await extractEnvironmentFromCommandPrompt(toolchain);
-  return {
+async function getCommonAnalyzeEnvironment(toolchain, options) {
+  const env = {
     CAEmitSarifLog: "1", // enable compatibility mode as GitHub does not support some sarif options
-    CAExcludePath: `${process.env.CAExcludePath || ""};${commandPromptEnv.INCLUDE}`, // exclude all implicit includes
-    INCLUDE: `${process.env.INCLUDE || ""};${commandPromptEnv.INCLUDE}`,
-    LIB: `${process.env.LIB || ""};${commandPromptEnv.LIB}`,
+    CAExcludePath: process.env.CAExcludePath || "",
+    INCLUDE: process.env.INCLUDE || "",
+    LIB: process.env.LIB || "",
   };
+
+  if (options.loadImplicitCompilerEnv) {
+    const commandPromptEnv = await extractEnvironmentFromCommandPrompt(toolchain);
+    env.CAExcludePath += `;${commandPromptEnv.INCLUDE}`; // exclude all implicit includes
+    env.INCLUDE += `;${commandPromptEnv.INCLUDE}`;
+    env.LIB += `;${commandPromptEnv.LIB}`;
+  }
+
+  return env;
 }
 
 /**
- * Options to enable/disable different compiler features.
+ * Information required to run analysis on a single source file.
+ * @param {string} source absolute path to the source file being compiled
+ * @param {string} compiler absolute path to compiler used
+ * @param {string[]} args all compilation and analyze arguments to pass to cl.exe
+ * @param {[key: string]: string} env environment to use when running cl.exe
  */
- function CompilerCommandOptions() {
-  // Use /external command line options to ignore warnings in CMake SYSTEM headers.
-  this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
-  // TODO: add support to build precompiled headers before running analysis.
-  this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
-}
-
 function AnalyzeCommand(source, compiler, args, env) {
   this.source = source;
   this.compiler = compiler;
@@ -2286,6 +2331,14 @@ function AnalyzeCommand(source, compiler, args, env) {
   this.env = env;
 }
 
+/**
+ * Load information needed to compile and analyze each source file in the given CMake project.
+ * This makes use of the CMake file API and other sources to collect this data.
+ * @param {string} buildRoot absolute path to the build directory of the CMake project
+ * @param {string} resultsDir absolute path to the 'results' directory for creating SARIF files
+ * @param {CompilerCommandOptions} options options for different compiler features
+ * @returns list of information to compile and analyze each source file in the project
+ */
 async function createAnalysisCommands(buildRoot, resultsDir, options) {
   const replyIndexInfo = await loadCMakeApiReplies(buildRoot);
   const toolchainMap = loadToolchainMap(replyIndexInfo);
@@ -2321,7 +2374,8 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
 
       args.push(command.source);
 
-      const sarifLog = createSarifFilepath(resultsDir, command.source, analyzeCommands.length);
+      const sarifLog = path.join(resultsDir,
+        `${path.basename(source)}.${analyzeCommands.length}.sarif`);
       args.push(`/analyze:log${sarifLog}`);
 
       args = args.concat(commonArgsMap[toolchain.path]);
@@ -2334,9 +2388,9 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
 
 /**
  * Get 'results' directory action input and cleanup any stale SARIF files.
- * @returns the absolute path to the 'results' directory for SARIF files.
+ * @returns absolute path to the 'results' directory for creating SARIF files
  */
- function prepareResultsDir() {
+function prepareResultsDir() {
   const resultsDir = resolveInputPath("resultsDirectory", true);
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir, { recursive: true }, err => {
@@ -2346,69 +2400,65 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
     });
   }
 
-  const cleanSarif = core.getInput('cleanSarif');
-  switch (cleanSarif.toLowerCase()) {
-    case 'true':
-    {
-      // delete existing Sarif files that are consider stale
-      for (const entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
-        if (entry.isFile() && path.extname(entry.name).toLowerCase() == '.sarif') {
-          fs.unlinkSync(path.join(resultsDir, entry.name));
-        }
+  if (core.getInput('cleanSarif') == 'true') {
+    // delete existing Sarif files that are consider stale
+    for (const entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
+      if (entry.isFile() && path.extname(entry.name).toLowerCase() == '.sarif') {
+        fs.unlinkSync(path.join(resultsDir, entry.name));
       }
-      break;
     }
-    case 'false':
-      break;
-    default:
-      throw new Error('Unsupported value for \'cleanSarif\'. Must be either \'True\' or \'False\'');
   }
 
   return resultsDir;
 }
 
-if (require.main === require.cache[eval('__filename')]) {
-  (async () => {
-    try {
-      const buildDir = resolveInputPath("cmakeBuildDirectory", true);
-      if (!fs.existsSync(buildDir)) {
-        throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
-      }
+/**
+ * Main
+ */
+async function main() {
+  try {
+    const buildDir = resolveInputPath("cmakeBuildDirectory", true);
+    if (!fs.existsSync(buildDir)) {
+      throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
+    }
 
-      const resultsDir = prepareResultsDir();
-      const options = new CompilerCommandOptions();
-      const analyzeCommands = await createAnalysisCommands(buildDir, resultsDir, options);
+    const resultsDir = prepareResultsDir();
+    const options = new CompilerCommandOptions();
+    const analyzeCommands = await createAnalysisCommands(buildDir, resultsDir, options);
+    if (analyzeCommands.length == 0) {
+      throw new Error('No C/C++ files were found in the project that could be analyzed.');
+    }
 
-      if (analyzeCommands.length == 0) {
-        throw new Error('No C/C++ files were found in the project that could be analyzed.');
-      }
+    // TODO: parallelism
+    for (const command of analyzeCommands) {
+      const execOptions = {
+        cwd: buildDir,
+        env: command.env,
+      };
 
-      // TODO: parallelism
-      for (const command of analyzeCommands) {
-        const execOptions = {
-          cwd: buildDir,
-          env: command.env,
-        };
-
-        // TODO: stdout/stderr to log files
-        // TODO: timeouts
-        core.info(`Running analysis on: ${command.source}`);
+      // TODO: timeouts
+      core.info(`Running analysis on: ${command.source}`);
+      try {
+        await exec.exec(`"${command.compiler}"`, command.args, execOptions);
+      } catch (err) {
         core.debug("Environment:");
         core.debug(execOptions.env);
-        try {
-          await exec.exec(`"${command.compiler}"`, command.args, execOptions);
-        } catch (err) {
-          core.warning(`Compilation failed with error: ${err}`);
-        }
-      }
-
-    } catch (error) {
-      if (core.isDebug()) {
-        core.setFailed(error.stack)
-      } else {
-        core.setFailed(error)
+        core.warning(`Compilation failed with error: ${err}`);
       }
     }
+
+  } catch (error) {
+    if (core.isDebug()) {
+      core.setFailed(error.stack)
+    } else {
+      core.setFailed(error)
+    }
+  }
+}
+
+if (require.main === require.cache[eval('__filename')]) {
+  (async () => {
+    await main();
   })();
 }
 })();

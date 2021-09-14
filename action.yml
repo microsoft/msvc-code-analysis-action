@@ -16,6 +16,10 @@ inputs:
   cleanSarif:
     description: 'SARIF files will under `results` directory are considered stale and will be deleted.'
     default: true
+  loadImplicitCompilerEnv:
+    description: 'Load implicit includes/libs for the given MSVC toolset using Visual Studio Command Prompt. Set to
+                  false if already loaded or a custom include path is needed.'
+    default: true
   args:
     description: 'Optional parameters to pass to every instance of the compiler.'
     required: false

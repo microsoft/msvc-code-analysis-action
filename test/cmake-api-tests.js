@@ -321,9 +321,9 @@ describe("CMakeApi", () => {
         });
 
         it("cmake.exe failed to run", async () => {
-            td.when(exec.exec("cmake", td.matchers.anything())).thenResolve(1);
+            td.when(exec.exec("cmake", td.matchers.anything())).thenReject(new Error());
             await expect(loadCMakeApiReplies(cmakeBuildDir)).to.be.rejectedWith(
-                "CMake failed to run with non-zero exit code: 1");
+                "CMake failed to reconfigure project with error:");
         });
 
         it("cmake not run (missing .cmake/api dir)", async () => {
