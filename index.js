@@ -532,7 +532,7 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
       args.push(command.source);
 
       const sarifLog = path.join(resultsDir,
-        `${path.basename(source)}.${analyzeCommands.length}.sarif`);
+        `${path.basename(command.source)}.${analyzeCommands.length}.sarif`);
       args.push(`/analyze:log${sarifLog}`);
 
       args = args.concat(commonArgsMap[toolchain.path]);
