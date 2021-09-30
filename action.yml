@@ -12,11 +12,11 @@ inputs:
     default: 'NativeRecommendedRules.ruleset'
   ignoredTargetPaths:
     description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful for excluding
-                  code such as unit tests. List is ";" seperated and can be absolute or relative to "github.workspace"'.
+                  code such as unit tests. List is ";" seperated and can be absolute or relative to "github.workspace"'
     required: false
   ignoredIncludePaths:
     description: 'Any paths in this list will be treated as SYSTEM includes and will be excluded from analysis. This requires
-                 "ignoreSystemHeaders == true". List is ";" seperated and can be absolute or relative to "github.workspace"'.
+                 "ignoreSystemHeaders == true". List is ";" seperated and can be absolute or relative to "github.workspace"'
     required: false
   ignoreSystemHeaders:
     description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
