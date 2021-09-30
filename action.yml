@@ -10,6 +10,12 @@ inputs:
   ruleset:
     description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'
+  ignoredTargetPaths:
+    description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful for excluding
+                  code such as unit tests. List is ";" seperated and can be absolute or relative to "github.workspace"'.
+  ignoredIncludePaths:
+    description: 'Any paths in this list will be treated as SYSTEM includes and will be excluded from analysis. This requires
+                 "ignoreSystemHeaders == true". List is ";" seperated and can be absolute or relative to "github.workspace"'.
   ignoreSystemHeaders:
     description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
     default: true
@@ -20,7 +26,7 @@ inputs:
     description: 'Load implicit includes/libs for the given MSVC toolset using Visual Studio Command Prompt. Set to
                   false if already loaded or a custom include path is needed.'
     default: true
-  args:
+  additionalArgs:
     description: 'Optional parameters to pass to every instance of the compiler.'
     required: false
 runs:

@@ -22,6 +22,14 @@ function isDirectoryEmpty(buildRoot) {
 }
 
 /**
+ * Validate if the given directory both exists and is non-empty.
+ * @returns Promise<string> true if the directory is empty
+ */
+function isSubdirectory(parentDir, subDir) {
+  return path.normalize(subDir).startsWith(path.normalize(parentDir));
+}
+
+/**
  * Get normalized relative path from a given file/directory.
  * @param {string} fromPath path to join relative path to
  * @param {string} relativePath relative path to append
@@ -52,6 +60,28 @@ function resolveInputPath(input, required = false) {
   }
 
   return inputPath;
+}
+
+/**
+ * Validate and resolve action input paths making non-absolute paths relative to
+ * GitHub repository root. Paths are seperated by the provided string.
+ * @param {string} input name of GitHub action input variable
+ * @param {boolean} required if true the input must be non-empty
+ * @returns the absolute path to the input path if specified
+ */
+function resolveInputPaths(input, required = false, seperator = ';') {
+  const inputPaths = core.getInput(input);
+  if (!inputPaths) {
+    if (required) {
+      throw new Error(input + " input paths can not be empty.");
+    }
+
+    return [];
+  }
+
+  return inputPaths.split(seperator)
+    .map((inputPath) => resolveInputPath(inputPath))
+    .filter((inputPath) => inputPath);
 }
 
 /**
@@ -290,7 +320,7 @@ function CompileCommand(group, source) {
  * @param {ReplyIndexInfo} replyIndexInfo ReplyIndexInfo info extracted from index-xxx.json reply
  * @returns CompileCommand information for each compiled source file in the project
  */
-function loadCompileCommands(replyIndexInfo) {
+function loadCompileCommands(replyIndexInfo, excludedTargetPaths) {
   if (!fs.existsSync(replyIndexInfo.codemodelResponseFile)) {
     throw new Error("Failed to load codemodel response from CMake API");
   }
@@ -299,7 +329,13 @@ function loadCompileCommands(replyIndexInfo) {
   const codemodel = parseReplyFile(replyIndexInfo.codemodelResponseFile);
   const sourceRoot = codemodel.paths.source;
   const replyDir = path.dirname(replyIndexInfo.codemodelResponseFile);
-  for (const targetInfo of codemodel.configurations[0].targets) {
+  const codemodelInfo = codemodel.configurations[0];
+  for (const targetInfo of codemodelInfo.targets) {
+    const targetDir = path.join(sourceRoot, codemodelInfo.directories[targetInfo.directoryIndex].source);
+    if (excludedTargetPaths.some((excludePath) => isSubdirectory(excludePath, targetDir))) {
+      continue;
+    }
+
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
     for (const group of target.compileGroups || []) {
       for (const sourceIndex of group.sourceIndexes) {
@@ -370,11 +406,21 @@ function findRuleset(rulesetDirectory) {
 /**
  * Options to enable/disable different compiler features.
  */
- function CompilerCommandOptions() {
+function CompilerCommandOptions() {
   // Use /external command line options to ignore warnings in CMake SYSTEM headers.
   this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
   // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
   this.loadImplicitCompilerEnv = core.getInput("loadImplicitCompilerEnv");
+  // Ignore analysis on any CMake targets defined in these paths
+  this.ignoredTargetPaths = resolveInputPaths("ignoredTargetPaths");
+  // Additional include paths to exclude from analysis
+  this.ignoredIncludePaths = resolveInputPaths("ignoredIncludePaths")
+    .map((include) => new IncludePath(include, true));
+  if (this.ignoredIncludePaths && !this.ignoreSystemHeaders) {
+    throw new Error("Use of 'ignoredIncludePaths' requires 'ignoreSystemHeaders == true'");
+  }
+  // Additional arguments to add the command-line of every analysis instance
+  this.additionalArgs = core.getInput("additionalArgs");
   // TODO: add support to build precompiled headers before running analysis.
   this.usePrecompiledHeaders = false; // core.getInput("usePrecompiledHeaders");
 }
@@ -407,6 +453,10 @@ function getCommonAnalyzeArguments(toolchain, options) {
   if (options.ignoreSystemHeaders) {
     args.push(`/external:W0`);
     args.push(`/analyze:external-`);
+  }
+
+  if (options.additionalArgs) {
+    args = args.concat(toolrunner.argStringToArray(options.additionalArgs));
   }
 
   return args;
@@ -499,7 +549,7 @@ function AnalyzeCommand(source, compiler, args, env) {
 async function createAnalysisCommands(buildRoot, resultsDir, options) {
   const replyIndexInfo = await loadCMakeApiReplies(buildRoot);
   const toolchainMap = loadToolchainMap(replyIndexInfo);
-  const compileCommands = loadCompileCommands(replyIndexInfo);
+  const compileCommands = loadCompileCommands(replyIndexInfo, options.ignoredTargetPaths);
 
   let commonArgsMap = {};
   let commonEnvMap = {};
@@ -515,7 +565,8 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
       let args = toolrunner.argStringToArray(command.args);
-      const allIncludes = toolchain.includes.concat(command.includes);
+      const allIncludes = toolchain.includes.concat(
+        command.includes, options.ignoredIncludePaths);
       for (const include of allIncludes) {
         if (options.ignoreSystemHeaders && include.isSystem) {
           // TODO: filter compilers that don't support /external.

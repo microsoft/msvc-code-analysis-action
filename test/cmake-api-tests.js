@@ -73,15 +73,31 @@ defaultFileContents[cmakeCodemodelReply] = {
     "configurations" : [
         {
             "name": "Regular",
+            "directories": [
+                { "source": "." },
+                { "source": "test" }
+            ],
             "targets": [
-                { "jsonFile": cmakeTarget1Reply },
-                { "jsonFile": cmakeTarget2Reply }
+                { 
+                    "directoryIndex": 0,
+                    "jsonFile": cmakeTarget1Reply
+                },
+                {
+                    "directoryIndex": 0,
+                    "jsonFile": cmakeTarget2Reply
+                }
             ]
         },
         {
             "name": "OnlyTarget2",
+            "directories": [
+                { "source": "." }
+            ],
             "targets": [
-                { "jsonFile": cmakeTarget2Reply }
+                { 
+                    "directoryIndex": 0,
+                    "jsonFile": cmakeTarget2Reply
+                }
             ]
         }
     ]
@@ -291,9 +307,16 @@ describe("CMakeApi", () => {
     // Common tests.
     it("loadCompileCommands", async () => {
         const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
-        const compileCommands = loadCompileCommands(replyIndexInfo);
+        const compileCommands = loadCompileCommands(replyIndexInfo, []);
         validateCompileCommands(compileCommands);
         compileCommands.length.should.equal(totalCompileCommands);
+    });
+
+    it("filterAllCommands", async () => {
+        const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
+        const compileCommands = loadCompileCommands(replyIndexInfo, [cmakeSrcDir]);
+        validateCompileCommands(compileCommands);
+        compileCommands.length.should.equal(0);
     });
 
     it("loadToolchainMap", async () => {
