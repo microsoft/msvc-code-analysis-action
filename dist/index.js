@@ -1883,6 +1883,17 @@ function getRelativeTo(fromPath, relativePath) {
 }
 
 /**
+ * Validate and resolve path by making non-absolute paths relative to GitHub
+ * repository root.
+ * @param {string} unresolvedPath path to resolve
+ * @returns the resolved absolute path
+ */
+function resolvePath(unresolvedPath) {
+  return path.isAbsolute(unresolvedPath) ? 
+    unresolvedPath : path.join(process.env.GITHUB_WORKSPACE, unresolvedPath);
+}
+
+/**
  * Validate and resolve action input path by making non-absolute paths relative to
  * GitHub repository root.
  * @param {string} input name of GitHub action input variable
@@ -1897,12 +1908,7 @@ function resolveInputPath(input, required = false) {
     }
   }
 
-  if (!path.isAbsolute(inputPath)) {
-    // make path relative to the repo root if not absolute
-    inputPath = path.join(process.env.GITHUB_WORKSPACE, inputPath);
-  }
-
-  return inputPath;
+  return resolvePath(inputPath, required);
 }
 
 /**
@@ -1923,7 +1929,7 @@ function resolveInputPaths(input, required = false, seperator = ';') {
   }
 
   return inputPaths.split(seperator)
-    .map((inputPath) => resolveInputPath(inputPath))
+    .map((inputPath) => resolvePath(inputPath))
     .filter((inputPath) => inputPath);
 }
 

@@ -2,7 +2,8 @@ cmake_minimum_required (VERSION 3.20.5)
 project (Sample)
 
 add_library (${PROJECT_NAME}
-  src/test.cpp)
+  src/test.cpp
+)
 
 set_target_properties(${PROJECT_NAME}
   PROPERTIES
@@ -15,3 +16,5 @@ target_include_directories (${PROJECT_NAME}
   SYSTEM PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+add_subdirectory(tests)
