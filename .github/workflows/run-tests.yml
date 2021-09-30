@@ -54,6 +54,7 @@ jobs:
         resultsDirectory: ${{ env.results }}
         ruleset: AllRules.ruleset
         ignoreSystemHeaders: true
+        ignoredTargetPaths: test/sample/tests
 
     - name: Upload SARIF artifacts
       uses: actions/upload-artifact@v2
