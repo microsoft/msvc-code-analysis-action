@@ -5,6 +5,7 @@ const exec = require('@actions/exec');
 const fs = require('fs');
 const io = require('@actions/io');
 const path = require('path');
+const tmp = require('tmp');
 const toolrunner = require('@actions/exec/lib/toolrunner');
 
 const CMakeApiClientName = "client-msvc-ca-action";
@@ -536,20 +537,21 @@ async function getCommonAnalyzeEnvironment(toolchain, options) {
  * @param {string} compiler absolute path to compiler used
  * @param {string[]} args all compilation and analyze arguments to pass to cl.exe
  * @param {[key: string]: string} env environment to use when running cl.exe
+ * @param {string} sarifLog absolute path to SARIF log file that will be produced
  */
-function AnalyzeCommand(source, compiler, args, env) {
+function AnalyzeCommand(source, compiler, args, env, sarifLog) {
   this.source = source;
   this.compiler = compiler;
   this.args = args;
   this.env = env;
+  this.sarifLog = sarifLog;
 }
 
 /**
  * Load information needed to compile and analyze each source file in the given CMake project.
  * This makes use of the CMake file API and other sources to collect this data.
  * @param {string} buildRoot absolute path to the build directory of the CMake project
- * @param {string} resultsDir absolute path to the 'results' directory for creating SARIF files
- * @param {CompilerCommandOptions} options options for different compiler features
+ * @param {string} resultsDir absolute path to the 'results' directory for creating SARIF files * @param {CompilerCommandOptions} options options for different compiler features
  * @returns list of information to compile and analyze each source file in the project
  */
 async function createAnalysisCommands(buildRoot, resultsDir, options) {
@@ -588,57 +590,104 @@ async function createAnalysisCommands(buildRoot, resultsDir, options) {
 
       args.push(command.source);
 
-      const sarifLog = path.join(resultsDir,
-        `${path.basename(command.source)}.${analyzeCommands.length}.sarif`);
+      const sarifLog = null;
+      try {
+        sarifLog = tmp.fileSync({ postfix: '.sarif', discardDescriptor: true });
+      } catch (err) {
+        // Clean up all temp SARIF logs
+        analyzeCommands.forEach(command => fs.unlink(command.sarifLog));
+        throw Error("Failed to create temporary file to write SARIF.", err);
+      }
+      
       args.push(`/analyze:log${sarifLog}`);
 
       args = args.concat(commonArgsMap[toolchain.path]);
-      analyzeCommands.push(new AnalyzeCommand(command.source, toolchain.path, args, commonEnvMap[toolchain.path]));
+      analyzeCommands.push(new AnalyzeCommand(
+        command.source, toolchain.path, args, commonEnvMap[toolchain.path], sarifLog));
     }
   }
 
   return analyzeCommands;
 }
 
-/**
- * Get 'results' directory action input and cleanup any stale SARIF files.
- * @returns absolute path to the 'results' directory for creating SARIF files
- */
-function prepareResultsDir() {
-  const resultsDir = resolveInputPath("resultsDirectory", true);
-  if (!fs.existsSync(resultsDir)) {
-    fs.mkdirSync(resultsDir, { recursive: true }, err => {
-      if (err) {
-        throw new Error("Failed to create 'results' directory which did not exist.");
+// TODO: use a more performant data-structure such a hash-set
+function ResultCache() {
+  this.files = {};
+  this.addIfUnique = function(sarifResult) {
+    const file = sarifResult.locations[0].physicalLocation.artifactLocation.uri;
+    const id = sarifResult.ruleId;
+    const line = sarifResult.locations[0].physicalLocation.region.startLine;
+    const column = sarifResult.locations[0].physicalLocation.region.startColumn;
+    const message = sarifResult.message.text;
+    if (this.files.hasOwnProperty(file)) {
+      const fileCache = this.files[file];
+      if (fileCache.hasOwnProperty(id)) {
+        const ruleCache = fileCache[id];
+        if (ruleCache.some((result) => result.line == line && result.column == column &&
+          result.message == message)) {
+            return false;
+        }
+      } else {
+        fileCache[id] = [];
       }
-    });
-  }
-
-  if (core.getInput('cleanSarif') == 'true') {
-    // delete existing Sarif files that are consider stale
-    for (const entry of fs.readdirSync(resultsDir, { withFileTypes : true })) {
-      if (entry.isFile() && path.extname(entry.name).toLowerCase() == '.sarif') {
-        fs.unlinkSync(path.join(resultsDir, entry.name));
-      }
+    } else {
+      this.files[file] = {};
     }
+
+    this.files[file][id].add({
+      line: line,
+      column: column,
+      message: message
+    });
+
+    return true;
+  };
+};
+
+function filterRun(run, resultCache) {
+  // remove any artifacts that don't contain results to reduce log size
+  run.artifacts = run.artifacts.filter(artifact => artifact.roles &&
+    artifact.roles.some(r => r == "resultFile"));
+
+  // remove any duplicate results from other sarif runs
+  run.results = run.results.filter(result => resultCache.addIfUnique(result));
+
+  return run;
+}
+
+function combineSarif(resultPath, sarifFiles) {
+  const resultCache = new ResultCache();
+  const combinedSarif = {
+    "version": "2.1.0",
+    "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.5.json",
+    "runs": []
+  };
+
+  for (const sarifFile of sarifFiles) {
+    const sarifLog = parseReplyFile(sarifFile);
+    combinedSarif.runs.add(filterRun(sarifLog.runs[0], resultCache));
   }
 
-  return resultsDir;
+  try {
+    fs.writeFileSync(resultPath, JSON.stringify(queryData), 'utf-8');
+  } catch (err) {
+    throw new Error("Failed to write combine SARIF result file.", err);
+  }
 }
 
 /**
  * Main
  */
 async function main() {
+  var analyzeCommands = []; 
   try {
     const buildDir = resolveInputPath("cmakeBuildDirectory", true);
     if (!fs.existsSync(buildDir)) {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
 
-    const resultsDir = prepareResultsDir();
     const options = new CompilerCommandOptions();
-    const analyzeCommands = await createAnalysisCommands(buildDir, resultsDir, options);
+    analyzeCommands = await createAnalysisCommands(buildDir, resultsDir, options);
     if (analyzeCommands.length == 0) {
       throw new Error('No C/C++ files were found in the project that could be analyzed.');
     }
@@ -661,12 +710,24 @@ async function main() {
       }
     }
 
+    const resultPath = resolveInputPath("resultPath", true);
+    if (!fs.existsSync(path.dirname(resultPath))) {
+      throw new Error("Directory of the 'resultPath' file must already exist.");
+    }
+
+    const sarifResults = analyzeCommands.map(command => command.sarifLog);
+    combineSarif(resultPath, sarifResults);
+
   } catch (error) {
     if (core.isDebug()) {
       core.setFailed(error.stack)
     } else {
       core.setFailed(error)
     }
+  } finally {
+    analyzeCommands.map(command => command.sarifLog)
+      .filter(log => fs.existsSync(log))
+      .forEach(log => fs.unlink(log));
   }
 }
 

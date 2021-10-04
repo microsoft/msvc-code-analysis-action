@@ -11,11 +11,11 @@ on:
 env:
   sample: '${{ github.workspace }}/test/sample'
   build: '${{ github.workspace }}/test/sample/build'
-  results: '${{ github.workspace }}/test/sample/results'
+  result: '${{ github.workspace }}/test/sample/result'
 
 jobs:
   build_and_test:
-    name: build and unit tests
+    name: Build and Test
     runs-on: windows-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
       run: npm test
 
   functional_test:
-    name: run functional tests
+    name: Run Functional Test
     runs-on: windows-latest
 
     steps:
@@ -51,14 +51,14 @@ jobs:
       uses: ./
       with:
         cmakeBuildDirectory: ${{ env.build }}
-        resultsDirectory: ${{ env.results }}
+        resultPath: ${{ env.result }}
         ruleset: AllRules.ruleset
         ignoreSystemHeaders: true
         ignoredTargetPaths: test/sample/tests
 
-    - name: Upload SARIF artifacts
+    - name: Upload SARIF artifact
       uses: actions/upload-artifact@v2
       with:
-        name: sarif-files
-        path: ${{ env.results }}/*
+        name: sarif-file
+        path: ${{ env.result }}
         if-no-files-found: error

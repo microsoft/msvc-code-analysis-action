@@ -4,8 +4,9 @@ inputs:
   cmakeBuildDirectory:
     description: 'The CMake build directory that should already be generated.'
     required: true
-  resultsDirectory:
-    description: 'The directory in which the individual SARIF files produced by analysis will be located.'
+  resultPath:
+    description: 'The path to generate the SARIF file that will combine the results from each analysis command. Can be
+                  absolute or relative to "github.workspace".'
     default: '${{ github.workspace }}/results'
   ruleset:
     description: 'Ruleset file used to determine what checks are run.'
@@ -20,9 +21,6 @@ inputs:
     required: false
   ignoreSystemHeaders:
     description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
-    default: true
-  cleanSarif:
-    description: 'SARIF files will under `results` directory are considered stale and will be deleted.'
     default: true
   loadImplicitCompilerEnv:
     description: 'Load implicit includes/libs for the given MSVC toolset using Visual Studio Command Prompt. Set to

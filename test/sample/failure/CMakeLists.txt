@@ -1,7 +1,7 @@
-set(TARGET_NAME Tests)
+set(TARGET_NAME Failure)
 
 add_library (${TARGET_NAME}
-  test.cpp
+  fail.cpp
 )
 
 set_target_properties(${TARGET_NAME}
