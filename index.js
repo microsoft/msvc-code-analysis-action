@@ -595,7 +595,7 @@ async function createAnalysisCommands(buildRoot, options) {
 
       args.push(command.source);
 
-      const sarifLog = null;
+      let sarifLog = null;
       try {
         sarifLog = tmp.fileSync({ postfix: '.sarif', discardDescriptor: true }).name;
       } catch (err) {
