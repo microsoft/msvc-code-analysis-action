@@ -6829,6 +6829,11 @@ function CompilerCommandOptions() {
 function getCommonAnalyzeArguments(toolchain, options) {
   const args = ["/analyze:only", "/analyze:quiet", "/analyze:log:format:sarif"];
 
+  // only show compiler information in debug mode
+  if (!core.isDebug()) {
+    args.push("/nologo");
+  }
+
   const espXEngine = findEspXEngine(toolchain);
   args.push(`/analyze:plugin${espXEngine}`);
 
@@ -6939,10 +6944,10 @@ function AnalyzeCommand(source, compiler, args, env, sarifLog) {
  * Load information needed to compile and analyze each source file in the given CMake project.
  * This makes use of the CMake file API and other sources to collect this data.
  * @param {string} buildRoot absolute path to the build directory of the CMake project
- * @param {string} resultsDir absolute path to the 'results' directory for creating SARIF files * @param {CompilerCommandOptions} options options for different compiler features
+ * @param {CompilerCommandOptions} options options for different compiler features
  * @returns list of information to compile and analyze each source file in the project
  */
-async function createAnalysisCommands(buildRoot, resultsDir, options) {
+async function createAnalysisCommands(buildRoot, options) {
   const replyIndexInfo = await loadCMakeApiReplies(buildRoot);
   const toolchainMap = loadToolchainMap(replyIndexInfo);
   const compileCommands = loadCompileCommands(replyIndexInfo, options.ignoredTargetPaths);
@@ -7075,7 +7080,7 @@ async function main() {
     }
 
     const options = new CompilerCommandOptions();
-    analyzeCommands = await createAnalysisCommands(buildDir, resultsDir, options);
+    analyzeCommands = await createAnalysisCommands(buildDir, options);
     if (analyzeCommands.length == 0) {
       throw new Error('No C/C++ files were found in the project that could be analyzed.');
     }
