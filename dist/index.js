@@ -6404,18 +6404,21 @@ const RelativeCommandPromptPath = '..\\..\\..\\..\\..\\..\\..\\Auxiliary\\Build\
 
 /**
  * Validate if the given directory both exists and is non-empty.
- * @returns Promise<string> true if the directory is empty
+ * @param {string} targetDir directory to test
+ * @returns {boolean} true if the directory is empty
  */
-function isDirectoryEmpty(buildRoot) {
-  return !buildRoot || !fs.existsSync(buildRoot) || (fs.readdirSync(buildRoot).length) == 0;
+function isDirectoryEmpty(targetDir) {
+  return !targetDir || !fs.existsSync(targetDir) || (fs.readdirSync(targetDir).length) == 0;
 }
 
 /**
- * Validate if the given directory both exists and is non-empty.
- * @returns Promise<string> true if the directory is empty
+ * Validate if the targetDir is either equal or a sub-directory of the parentDir
+ * @param {string} parentDir parent directory
+ * @param {string} targetDir directory to test
+ * @returns {boolean} true if sub-directory
  */
-function isSubdirectory(parentDir, subDir) {
-  return path.normalize(subDir).startsWith(path.normalize(parentDir));
+function isSubdirectory(parentDir, targetDir) {
+  return path.normalize(targetDir).startsWith(path.normalize(parentDir));
 }
 
 /**
