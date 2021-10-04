@@ -597,11 +597,11 @@ async function createAnalysisCommands(buildRoot, options) {
 
       const sarifLog = null;
       try {
-        sarifLog = tmp.fileSync({ postfix: '.sarif', discardDescriptor: true });
+        sarifLog = tmp.fileSync({ postfix: '.sarif', discardDescriptor: true }).name;
       } catch (err) {
         // Clean up all temp SARIF logs
         analyzeCommands.forEach(command => fs.unlink(command.sarifLog));
-        throw Error("Failed to create temporary file to write SARIF.", err);
+        throw Error(`Failed to create temporary file to write SARIF: ${err}`, err);
       }
       
       args.push(`/analyze:log${sarifLog}`);
