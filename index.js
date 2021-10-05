@@ -636,7 +636,7 @@ function ResultCache() {
       return false;
     }
 
-    ruleCache.add({
+    ruleCache.push({
       line: line,
       column: column,
       message: message
@@ -667,7 +667,7 @@ function combineSarif(resultPath, sarifFiles) {
 
   for (const sarifFile of sarifFiles) {
     const sarifLog = parseReplyFile(sarifFile);
-    combinedSarif.runs.add(filterRun(sarifLog.runs[0], resultCache));
+    combinedSarif.runs.push(filterRun(sarifLog.runs[0], resultCache));
   }
 
   try {
