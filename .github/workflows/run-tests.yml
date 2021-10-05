@@ -70,7 +70,7 @@ jobs:
 
     - name: Validate expected action outcome
       if: steps.run_action.outcome != matrix.outcome
-        run: exit 1
+      run: exit 1
 
     - name: Upload SARIF artifact
       uses: actions/upload-artifact@v2
