@@ -61,5 +61,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: sarif-file
-        path: ${{ steps.run_action.sarif }}
+        path: ${{ steps.run_action.outputs.sarif }}
         if-no-files-found: error

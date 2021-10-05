@@ -6438,8 +6438,8 @@ function getRelativeTo(fromPath, relativePath) {
  * @returns the resolved absolute path
  */
 function resolvePath(unresolvedPath) {
-  return path.isAbsolute(unresolvedPath) ? 
-    unresolvedPath : path.join(process.env.GITHUB_WORKSPACE, unresolvedPath);
+  return path.normalize(path.isAbsolute(unresolvedPath) ? 
+    unresolvedPath : path.join(process.env.GITHUB_WORKSPACE, unresolvedPath));
 }
 
 /**
