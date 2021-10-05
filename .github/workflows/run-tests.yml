@@ -32,7 +32,7 @@ jobs:
       run: npm test
 
   functional_test:
-    name: Function Test {{ matrix.name }}
+    name: Function Test - ${{ matrix.name }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -59,6 +59,7 @@ jobs:
       
     - name: Run action
       id: run_action
+      continue-on-error: true
       uses: ./
       with:
         cmakeBuildDirectory: ${{ env.build }}
@@ -66,11 +67,10 @@ jobs:
         ruleset: AllRules.ruleset
         ignoreSystemHeaders: true
         ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
-        continue-on-error: true
 
     - name: Validate expected action outcome
       if: steps.run_action.outcome != matrix.outcome
-      run: exit 1
+        run: exit 1
 
     - name: Upload SARIF artifact
       uses: actions/upload-artifact@v2
