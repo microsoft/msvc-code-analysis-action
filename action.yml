@@ -7,7 +7,7 @@ inputs:
   resultPath:
     description: 'The path to generate the SARIF file that will combine the results from each analysis command. Can be
                   absolute or relative to "github.workspace".'
-    default: '${{ github.workspace }}/results'
+    default: '${{ github.workspace }}/results.sarif'
   ruleset:
     description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'
@@ -29,6 +29,11 @@ inputs:
   additionalArgs:
     description: 'Optional parameters to pass to every instance of the compiler.'
     required: false
+outputs:
+  sarif:
+    description: 'The path to the generated SARIF file that is determined by the "resultPath" input if analysis
+                  completes successfully'
+
 runs:
   using: 'node12'
   main: 'dist/index.js'

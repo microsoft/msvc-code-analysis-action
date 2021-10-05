@@ -1,7 +1,7 @@
-// Duplicate warnings should be avoided in headers include > 1 times
 #include <string>
 
-const char *danglingRawPtrFromLocal()
+// Duplicate warnings will be avoided in headers included > 1 times
+const char *regularHeaderFunction()
 {
   std::string s;
   return s.c_str(); // C26816

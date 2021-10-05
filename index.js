@@ -442,12 +442,7 @@ function CompilerCommandOptions() {
  * @returns list of analyze arguments common to the given toolchain
  */
 function getCommonAnalyzeArguments(toolchain, options) {
-  const args = ["/analyze:only", "/analyze:quiet", "/analyze:log:format:sarif"];
-
-  // only show compiler information in debug mode
-  if (!core.isDebug()) {
-    args.push("/nologo");
-  }
+  const args = ["/analyze:only", "/analyze:quiet", "/analyze:log:format:sarif", "/nologo"];
 
   const espXEngine = findEspXEngine(toolchain);
   args.push(`/analyze:plugin${espXEngine}`);
@@ -688,6 +683,11 @@ async function main() {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
 
+    const resultPath = resolveInputPath("resultPath", true);
+    if (!fs.existsSync(path.dirname(resultPath))) {
+      throw new Error("Directory of the 'resultPath' file must already exist.");
+    }
+
     const options = new CompilerCommandOptions();
     analyzeCommands = await createAnalysisCommands(buildDir, options);
     if (analyzeCommands.length == 0) {
@@ -695,6 +695,7 @@ async function main() {
     }
 
     // TODO: parallelism
+    const failedSourceFiles = [];
     for (const command of analyzeCommands) {
       const execOptions = {
         cwd: buildDir,
@@ -706,19 +707,23 @@ async function main() {
       try {
         await exec.exec(`"${command.compiler}"`, command.args, execOptions);
       } catch (err) {
+        core.debug(`Compilation failed with error: ${err}`);
         core.debug("Environment:");
         core.debug(execOptions.env);
-        core.warning(`Compilation failed with error: ${err}`);
+        failedSourceFiles.push(command.source);
       }
     }
 
-    const resultPath = resolveInputPath("resultPath", true);
-    if (!fs.existsSync(path.dirname(resultPath))) {
-      throw new Error("Directory of the 'resultPath' file must already exist.");
+    if (failedSourceFiles.length > 0) {
+      const fileList = failedSourceFiles
+        .map(file => path.basename(file))
+        .join(",");
+      throw new Error(`Analysis failed due to compiler errors in files: ${fileList}`);
     }
 
     const sarifResults = analyzeCommands.map(command => command.sarifLog);
     combineSarif(resultPath, sarifResults);
+    core.setOutput("sarif", resultPath);
 
   } catch (error) {
     if (core.isDebug()) {

@@ -11,7 +11,7 @@ on:
 env:
   sample: '${{ github.workspace }}/test/sample'
   build: '${{ github.workspace }}/test/sample/build'
-  result: '${{ github.workspace }}/test/sample/result'
+  result: '${{ github.workspace }}/test/sample/build/results.sarif'
 
 jobs:
   build_and_test:
@@ -48,6 +48,7 @@ jobs:
         buildWithCMake: false
       
     - name: Run action
+      id: run_action
       uses: ./
       with:
         cmakeBuildDirectory: ${{ env.build }}
@@ -60,5 +61,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: sarif-file
-        path: ${{ env.result }}
+        path: ${{ steps.run_action.sarif }}
         if-no-files-found: error
