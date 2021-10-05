@@ -32,7 +32,7 @@ jobs:
       run: npm test
 
   functional_test:
-    name: Function Test - ${{ matrix.test }}
+    name: Functional - ${{ matrix.test }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -73,6 +73,7 @@ jobs:
       run: exit 1
 
     - name: Upload SARIF artifact
+      if: steps.run_action.outcome == 'success'
       uses: actions/upload-artifact@v2
       with:
         name: sarif-file
