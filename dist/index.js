@@ -6455,6 +6455,8 @@ function resolveInputPath(input, required = false) {
     if (required) {
       throw new Error(input + " input path can not be empty.");
     }
+
+    return undefined;
   }
 
   return resolvePath(inputPath, required);
@@ -7071,8 +7073,10 @@ async function main() {
       throw new Error("CMake build directory does not exist. Ensure CMake is already configured.");
     }
 
-    const resultPath = resolveInputPath("resultPath", true);
-    if (!fs.existsSync(path.dirname(resultPath))) {
+    let resultPath = resolveInputPath("resultsPath", false);
+    if (!resultPath) {
+      resultPath = path.join(buildDir, "results.sarif");
+    } else if (!fs.existsSync(path.dirname(resultPath))) {
       throw new Error("Directory of the 'resultPath' file must already exist.");
     }
 
