@@ -32,16 +32,16 @@ jobs:
       run: npm test
 
   functional_test:
-    name: Function Test - ${{ matrix.name }}
+    name: Function Test - ${{ matrix.test }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        using:
-          - name: Regular
+        include:
+          - test: Regular
             outcome: success
             ignoredTargetPaths: test/sample/failure
-          - name: Compilation Error
+          - test: Compilation Error
             outcome: failure
             ignoredTargetPaths: ''
 
