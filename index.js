@@ -627,22 +627,16 @@ function ResultCache() {
     const line = sarifResult.locations[0].physicalLocation.region.startLine;
     const column = sarifResult.locations[0].physicalLocation.region.startColumn;
     const message = sarifResult.message.text;
-    if (this.files.hasOwnProperty(file)) {
-      const fileCache = this.files[file];
-      if (fileCache.hasOwnProperty(id)) {
-        const ruleCache = fileCache[id];
-        if (ruleCache.some((result) => result.line == line && result.column == column &&
-          result.message == message)) {
-            return false;
-        }
-      } else {
-        fileCache[id] = [];
-      }
-    } else {
-      this.files[file] = {};
+    this.files[file] = this.files[file] || {};
+    this.files[file][id] = this.files[file][id] || [];
+
+    const ruleCache = this.files[file][id];
+    if (ruleCache.some((result) => 
+          result.line == line && result.column == column && result.message == message)) {
+      return false;
     }
 
-    this.files[file][id].add({
+    ruleCache.add({
       line: line,
       column: column,
       message: message
