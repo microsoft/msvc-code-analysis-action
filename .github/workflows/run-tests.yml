@@ -32,8 +32,18 @@ jobs:
       run: npm test
 
   functional_test:
-    name: Run Functional Test
+    name: Function Test {{ matrix.name }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        using:
+          - name: Regular
+            outcome: success
+            ignoredTargetPaths: test/sample/failure
+          - name: Compilation Error
+            outcome: failure
+            ignoredTargetPaths: ''
 
     steps:
     - name: Checkout action
@@ -55,7 +65,12 @@ jobs:
         resultPath: ${{ env.result }}
         ruleset: AllRules.ruleset
         ignoreSystemHeaders: true
-        #ignoredTargetPaths: test/sample/failure
+        ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
+        continue-on-error: true
+
+    - name: Validate expected action outcome
+      if: steps.run_action.outcome != matrix.outcome
+        run: exit 1
 
     - name: Upload SARIF artifact
       uses: actions/upload-artifact@v2
