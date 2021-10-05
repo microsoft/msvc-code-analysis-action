@@ -15,7 +15,13 @@ set_target_properties(${PROJECT_NAME}
 
 target_include_directories (${PROJECT_NAME}
   SYSTEM PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/system
 )
+
+target_include_directories (${PROJECT_NAME}
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/regular
+)
+
 
 add_subdirectory(failure)

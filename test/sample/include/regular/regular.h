@@ -1,6 +1,4 @@
-
-// Marked as System header in CMake
-// No warning should be issued if ignoreSystemHeaders is used
+// Duplicate warnings should be avoided in headers include > 1 times
 #include <string>
 
 const char *danglingRawPtrFromLocal()
