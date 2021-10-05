@@ -6991,7 +6991,7 @@ async function createAnalysisCommands(buildRoot, options) {
         sarifLog = tmp.fileSync({ postfix: '.sarif', discardDescriptor: true }).name;
       } catch (err) {
         // Clean up all temp SARIF logs
-        analyzeCommands.forEach(command => fs.unlink(command.sarifLog));
+        analyzeCommands.forEach(command => fs.unlinkSync(command.sarifLog));
         throw Error(`Failed to create temporary file to write SARIF: ${err}`, err);
       }
       
@@ -7059,9 +7059,9 @@ function combineSarif(resultPath, sarifFiles) {
   }
 
   try {
-    fs.writeFileSync(resultPath, JSON.stringify(queryData), 'utf-8');
+    fs.writeFileSync(resultPath, JSON.stringify(combinedSarif), 'utf-8');
   } catch (err) {
-    throw new Error("Failed to write combine SARIF result file.", err);
+    throw new Error("Failed to write combined SARIF result file.", err);
   }
 }
 
@@ -7117,7 +7117,7 @@ async function main() {
   } finally {
     analyzeCommands.map(command => command.sarifLog)
       .filter(log => fs.existsSync(log))
-      .forEach(log => fs.unlink(log));
+      .forEach(log => fs.unlinkSync(log));
   }
 }
 
