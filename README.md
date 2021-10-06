@@ -1,8 +1,8 @@
-# msvc-code-analysis-action
+# Microsoft C++ Code Analysis Action
 
 This actions run code analysis for any CMake project built with the Microsoft Visual C++ Compiler. The analysis
 will produce SARIF results that can be uploaded to the GitHub Code Scanning Alerts experience and/or included as
-artifacts to view locally in the Sarif Viewer for VSCode.
+an artifact to view locally in the Sarif Viewer VSCode Extension.
 
 ## Usage
 
@@ -15,14 +15,14 @@ of generated files.
 
 ### Input Parameters
 
-Description of all input parameters: [action.yml](https://github.com/microsoft/msvc-code-analysis-action/blob/redesign/action.yml)
+Description of all input parameters: [action.yml](https://github.com/microsoft/msvc-code-analysis-action/blob/main/action.yml)
+
 
 ### Example
 
 ```yml
 env:
   build: '${{ github.workspace }}/build'
-  results: ${{ github.workspace }}/build/results
 
 jobs:
   build:
@@ -38,26 +38,27 @@ jobs:
           cmakeListsTxtPath: ${{ github.workspace }}/CMakeLists.txt
 
       # Run Microsoft Visual C++ code analysis
-      - name: Initialize MSVC Code Analysis 
+      - name: Initialize MSVC Code Analysis
         uses: microsoft/msvc-code-analysis-action
+        # Provide a unique ID to access the sarif output path
+        id: run-analysis
         with:
           cmakeBuildDirectory: ${{ env.build }}
-          resultsDirectory: ${{ env.results }}
           # Ruleset file that will determine what checks will be run
           ruleset: NativeRecommendRules.ruleset
 
-      # Upload all SARIF files to GitHub Code Scanning Alerts
+      # Upload SARIF file to GitHub Code Scanning Alerts
       - name: Upload SARIF to Github
         uses: github/codeql-action/upload-sarif@v1
         with:
-          sarif_file: ${{ env.results }}
+          sarif_file: ${{ steps.run-analysis.outputs.sarif }}
 
-      # Upload all SARIF files as Artifacts to download and view
-      - name: Upload SARIF as Artifacts
+      # Upload SARIF file as an Artifact to download and view
+      - name: Upload SARIF as an Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: sarif-files
-          path: ${{ env.results }}
+          name: sarif-file
+          path: ${{ steps.run-analysis.outputs.sarif }}
 ```
 
 ## Contributing
