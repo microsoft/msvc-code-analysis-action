@@ -1,22 +1,38 @@
-name: 'MSVC Code Analysis Action'
-description: 'Setup MSVC to produce Code Analysis SARIF files for use in github/codeql-action/upload-sarif@v1'
+name: 'Microsoft C++ Code Analysis Action'
+description: 'Run Microsoft C++ Code Analysis to produce SARIF files for use in github/codeql-action/upload-sarif@v1'
 inputs:
-  mode:
-    description: 'Operation mode given different environments and build systems.'
-    default: 'General'
-  results:
-    description: 'root directory containing all SARIF files produced in build.'
-    default: '${{ github.workspace }}'
+  cmakeBuildDirectory:
+    description: 'The CMake build directory that should already be generated.'
+    required: true
   ruleset:
-    description: 'Ruleset file to use during analysis.'
+    description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'
-  cleanSarif:
-    description: 'SARIF files will under `results` directory are considered stale and will be deleted.'
-    default: 'True'
-  args:
+  ignoredTargetPaths:
+    description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful for excluding
+                  code such as unit tests. List is ";" seperated and can be absolute or relative to "github.workspace"'
+    required: false
+  ignoredIncludePaths:
+    description: 'Any paths in this list will be treated as SYSTEM includes and will be excluded from analysis. This requires
+                 "ignoreSystemHeaders == true". List is ";" seperated and can be absolute or relative to "github.workspace"'
+    required: false
+  ignoreSystemHeaders:
+    description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
+    default: true
+  resultsPath:
+    description: 'Optional path to generate the SARIF file to. If not supplied "results.sarif" will be created in the CMake
+                  build directory. Path can be absolute or relative to "github.workspace".'
+    required: false
+  loadImplicitCompilerEnv:
+    description: 'Load implicit includes/libs for the given MSVC toolset using Visual Studio Command Prompt. Set to
+                  false if already loaded or a custom include path is needed.'
+    default: true
+  additionalArgs:
     description: 'Optional parameters to pass to every instance of the compiler.'
     required: false
+outputs:
+  sarif:
+    description: 'The path to the SARIF file that is generated containing all the results.'
 
 runs:
   using: 'node12'
-  main: 'index.js'
+  main: 'dist/index.js'

@@ -1,0 +1,81 @@
+name: 'run-tests'
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * SUN'
+
+env:
+  sample: '${{ github.workspace }}/test/sample'
+  build: '${{ github.workspace }}/test/sample/build'
+  result: '${{ github.workspace }}/test/sample/build/results.sarif'
+
+jobs:
+  build_and_test:
+    name: Build and Test
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout action
+      uses: actions/checkout@v2.3.4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v2.4.0
+      with:
+        node-version: '12.x'
+    - name: Build
+      run: npm install
+    - name: Test
+      run: npm test
+
+  functional_test:
+    name: Functional - ${{ matrix.test }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - test: Regular
+            outcome: success
+            ignoredTargetPaths: test/sample/failure
+          - test: Compilation Error
+            outcome: failure
+            ignoredTargetPaths: ''
+
+    steps:
+    - name: Checkout action
+      uses: actions/checkout@v2.3.4
+
+    - name: Initialize sample CMake Project
+      uses: lukka/run-cmake@v3
+      with:
+        cmakeListsTxtPath: ${{ env.sample }}/CMakeLists.txt
+        buildDirectory: ${{ env.build }}
+        cmakeGenerator: VS16Win64
+        buildWithCMake: false
+      
+    - name: Run action
+      id: run_action
+      continue-on-error: true
+      uses: ./
+      with:
+        cmakeBuildDirectory: ${{ env.build }}
+        resultPath: ${{ env.result }}
+        ruleset: AllRules.ruleset
+        ignoreSystemHeaders: true
+        ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
+
+    - name: Validate expected action outcome
+      if: steps.run_action.outcome != matrix.outcome
+      run: exit 1
+
+    - name: Upload SARIF artifact
+      if: steps.run_action.outcome == 'success'
+      uses: actions/upload-artifact@v2
+      with:
+        name: sarif-file
+        path: ${{ steps.run_action.outputs.sarif }}
+        if-no-files-found: error
