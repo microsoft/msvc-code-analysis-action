@@ -44,11 +44,11 @@ jobs:
             ignoredTargetPaths: test/sample/failure
           - test: Custom ruleset
             outcome: success
-            ruleset: ${{ env.sample }}/Custom.ruleset
+            ruleset: test/sample/Custom.ruleset
             ignoredTargetPaths: test/sample/failure
           - test: Invalid ruleset
             outcome: failure
-            ruleset: ${{ env.sample }}/Invalid.ruleset
+            ruleset: ${{ github.workspace }}/test/sample/Invalid.ruleset
             ignoredTargetPaths: test/sample/failure
           - test: Compilation Error
             outcome: failure
