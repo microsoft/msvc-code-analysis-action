@@ -40,9 +40,15 @@ jobs:
         include:
           - test: Regular
             outcome: success
+            ruleset: NativeRecommendedRules.ruleset
+            ignoredTargetPaths: test/sample/failure
+          - test: Custom ruleset
+            outcome: success
+            ruleset: AllRules.ruleset
             ignoredTargetPaths: test/sample/failure
           - test: Compilation Error
             outcome: failure
+            ruleset: NativeRecommendedRules.ruleset
             ignoredTargetPaths: ''
 
     steps:
@@ -63,8 +69,8 @@ jobs:
       uses: ./
       with:
         cmakeBuildDirectory: ${{ env.build }}
-        resultPath: ${{ env.result }}
-        ruleset: AllRules.ruleset
+        resultsPath: ${{ env.result }}
+        ruleset: ${{ matrix.ruleset }}
         ignoreSystemHeaders: true
         ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
 
