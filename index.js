@@ -630,7 +630,7 @@ function ResultCache() {
     }
 
     if (!sarifResult.locations || !sarifResult.locations[0] || !sarifResult.locations[0].physicalLocation) {
-        throw Error(`Found warning with no location, resolve before continuing: ${id}: ${message}`);
+        throw Error(`Found warning with no location, resolve before continuing:\n${id}: ${message}`);
     }
 
     const physicalLocation = sarifResult.locations[0].physicalLocation;
@@ -638,7 +638,7 @@ function ResultCache() {
     const line = physicalLocation.region ? physicalLocation.region.startLine : undefined;
     const column = physicalLocation.region ? physicalLocation.region.startColumn : undefined;
     if (file == undefined || line == undefined || column == undefined) {
-      throw Error(`Found warning with invalid location, resolve before continuing: ${id}: ${message}`);
+      throw Error(`Found warning with invalid location, resolve before continuing:\n${id}: ${message}`);
     }
 
     this.files[file] = this.files[file] || {};
