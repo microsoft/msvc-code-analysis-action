@@ -619,11 +619,16 @@ async function createAnalysisCommands(buildRoot, options) {
 function ResultCache() {
   this.files = {};
   this.addIfUnique = function(sarifResult) {
-    const file = sarifResult.locations[0].physicalLocation.artifactLocation.uri;
-    const id = sarifResult.ruleId;
-    const line = sarifResult.locations[0].physicalLocation.region.startLine;
-    const column = sarifResult.locations[0].physicalLocation.region.startColumn;
-    const message = sarifResult.message.text;
+    const id = sarifResult?.ruleId || "";
+    const message = sarifResult?.message?.text || "";
+    const physicalLocation = sarifResult?.locations[0]?.physicalLocation;
+    const file = physicalLocation?.artifactLocation?.uri;
+    const line = physicalLocation?.region?.startLine;
+    const column = physicalLocation?.region?.startColumn;
+    if (file == undefined || line == undefined || column == undefined) {
+      throw Error(`Found warning with no location, resolve before continuing: ${id}: ${message}`, err);
+    }
+
     this.files[file] = this.files[file] || {};
     this.files[file][id] = this.files[file][id] || [];
 
