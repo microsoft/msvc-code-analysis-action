@@ -37,10 +37,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        outcome: [ success ]
+        ruleset: [ NativeRecommendRules.ruleset ]
+        ignoredTargetPaths: [ test/sample/failure ]
         include:
           - test: Regular
-            outcome: success
-            ignoredTargetPaths: test/sample/failure
+          - test: Custom ruleset
+            ruleset: AllRules.ruleset
           - test: Compilation Error
             outcome: failure
             ignoredTargetPaths: ''
@@ -64,7 +67,7 @@ jobs:
       with:
         cmakeBuildDirectory: ${{ env.build }}
         resultPath: ${{ env.result }}
-        ruleset: AllRules.ruleset
+        ruleset: ${{ matrix.ignoredTargetPaths }}
         ignoreSystemHeaders: true
         ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
 
