@@ -619,11 +619,28 @@ async function createAnalysisCommands(buildRoot, options) {
 function ResultCache() {
   this.files = {};
   this.addIfUnique = function(sarifResult) {
-    const file = sarifResult.locations[0].physicalLocation.artifactLocation.uri;
     const id = sarifResult.ruleId;
-    const line = sarifResult.locations[0].physicalLocation.region.startLine;
-    const column = sarifResult.locations[0].physicalLocation.region.startColumn;
-    const message = sarifResult.message.text;
+    if (!id) {
+      throw Error(`Found warning with no ID, resolve before continuing`);
+    }
+
+    const message = sarifResult.message ? sarifResult.message.text : undefined;
+    if (!message) {
+      throw Error(`Found warning with no message, resolve before continuing: ${id}`);
+    }
+
+    if (!sarifResult.locations || !sarifResult.locations[0] || !sarifResult.locations[0].physicalLocation) {
+        throw Error(`Found warning with no location, resolve before continuing:\n${id}: ${message}`);
+    }
+
+    const physicalLocation = sarifResult.locations[0].physicalLocation;
+    const file = physicalLocation.artifactLocation ? physicalLocation.artifactLocation.uri : undefined;
+    const line = physicalLocation.region ? physicalLocation.region.startLine : undefined;
+    const column = physicalLocation.region ? physicalLocation.region.startColumn : undefined;
+    if (file == undefined || line == undefined || column == undefined) {
+      throw Error(`Found warning with invalid location, resolve before continuing:\n${id}: ${message}`);
+    }
+
     this.files[file] = this.files[file] || {};
     this.files[file][id] = this.files[file][id] || [];
 
