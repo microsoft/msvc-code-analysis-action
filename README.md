@@ -22,33 +22,38 @@ Description of all input parameters: [action.yml](https://github.com/microsoft/m
 
 ```yml
 env:
+  # Path to the CMake build directory.
   build: '${{ github.workspace }}/build'
+  config: 'Debug'
 
 jobs:
-  build:
-    steps:
-      # Configure project with CMake
-      - name: Configure CMake
-        uses: lukka/run-cmake@v3
-        with:
-          buildDirectory: ${{ env.build }}
-          # Build is not require unless generated source files are used
-          buildWithCMake: false
-          cmakeGenerator: 'VS16Win64'
-          cmakeListsTxtPath: ${{ github.workspace }}/CMakeLists.txt
+  analyze:
+    name: Analyze
+    runs-on: windows-latest
 
-      # Run Microsoft Visual C++ code analysis
-      - name: Initialize MSVC Code Analysis
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Configure CMake
+        run: cmake -B ${{ env.build }} -DCMAKE_BUILD_TYPE=${{ env.config }}
+
+      # Build is not required unless generated source files are used
+      # - name: Build CMake
+      #   run: cmake --build ${{ env.build }} --config ${{ env.config }}
+
+      - name: Run MSVC Code Analysis
         uses: microsoft/msvc-code-analysis-action
         # Provide a unique ID to access the sarif output path
         id: run-analysis
         with:
           cmakeBuildDirectory: ${{ env.build }}
+          buildConfiguration: ${{ env.config }}
           # Ruleset file that will determine what checks will be run
           ruleset: NativeRecommendedRules.ruleset
 
       # Upload SARIF file to GitHub Code Scanning Alerts
-      - name: Upload SARIF to Github
+      - name: Upload SARIF to GitHub
         uses: github/codeql-action/upload-sarif@v1
         with:
           sarif_file: ${{ steps.run-analysis.outputs.sarif }}

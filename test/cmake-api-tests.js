@@ -307,16 +307,23 @@ describe("CMakeApi", () => {
     // Common tests.
     it("loadCompileCommands", async () => {
         const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
-        const compileCommands = loadCompileCommands(replyIndexInfo, []);
+        const compileCommands = loadCompileCommands(replyIndexInfo, "Regular", []);
         validateCompileCommands(compileCommands);
         compileCommands.length.should.equal(totalCompileCommands);
     });
 
-    it("filterAllCommands", async () => {
+    it("exclude targets", async () => {
         const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
-        const compileCommands = loadCompileCommands(replyIndexInfo, [cmakeSrcDir]);
+        const compileCommands = loadCompileCommands(replyIndexInfo, "Regular", [cmakeSrcDir]);
         validateCompileCommands(compileCommands);
         compileCommands.length.should.equal(0);
+    });
+
+    it("filter commands with config", async () => {
+        const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
+        const compileCommands = loadCompileCommands(replyIndexInfo, "OnlyTarget2", []);
+        validateCompileCommands(compileCommands);
+        compileCommands.length.should.equal(1);
     });
 
     it("loadToolchainMap", async () => {
@@ -374,6 +381,29 @@ describe("CMakeApi", () => {
             const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
             expect(() => loadToolchainMap(replyIndexInfo)).to.throw(
                 "Action requires use of MSVC for either/both C or C++.");
+        });
+
+        it("no configuration (multi-config)", async () => {
+            const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
+            expect(() => loadCompileCommands(replyIndexInfo, undefined, [])).to.throw(
+                "buildConfiguration is required for multi-config CMake Generators.");
+
+        });
+
+        it("invalid configuration (multi-config)", async () => {
+            const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
+            expect(() => loadCompileCommands(replyIndexInfo, "InvalidConfig", [])).to.throw(
+                "buildConfiguration does not match any available in CMake project.");
+
+        });
+        
+        it("invalid configuration (single-config", async () => {
+            editReplyContents(cmakeCodemodelReply, (reply) => {
+                reply.configurations.pop(); // Remove second entry, leaving 1
+            });
+            const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
+            expect(() => loadCompileCommands(replyIndexInfo, "InvalidConfig", [])).to.throw(
+                "buildConfiguration does not match 'Regular' configuration used by CMake.");
         });
     });
 });

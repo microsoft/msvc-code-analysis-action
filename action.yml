@@ -4,6 +4,10 @@ inputs:
   cmakeBuildDirectory:
     description: 'The CMake build directory that should already be generated.'
     required: true
+  buildConfiguration:
+    description: 'The build Configuration (Release, Debug, etc.) to use. This is required if using a
+                  multi-configuration CMake generator.'
+    required: false
   ruleset:
     description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'

@@ -6720,7 +6720,7 @@ function CompileCommand(group, source) {
  * @param {ReplyIndexInfo} replyIndexInfo ReplyIndexInfo info extracted from index-xxx.json reply
  * @returns CompileCommand information for each compiled source file in the project
  */
-function loadCompileCommands(replyIndexInfo, excludedTargetPaths) {
+function loadCompileCommands(replyIndexInfo, buildConfiguration, excludedTargetPaths) {
   if (!fs.existsSync(replyIndexInfo.codemodelResponseFile)) {
     throw new Error("Failed to load codemodel response from CMake API");
   }
@@ -6729,7 +6729,21 @@ function loadCompileCommands(replyIndexInfo, excludedTargetPaths) {
   const codemodel = parseReplyFile(replyIndexInfo.codemodelResponseFile);
   const sourceRoot = codemodel.paths.source;
   const replyDir = path.dirname(replyIndexInfo.codemodelResponseFile);
-  const codemodelInfo = codemodel.configurations[0];
+  let configurations = codemodel.configurations;
+  if (configurations.length > 1) {
+    if (!buildConfiguration) {
+      throw new Error("buildConfiguration is required for multi-config CMake Generators.");
+    }
+
+    configurations = configurations.filter((config) => buildConfiguration == config.name);
+    if (configurations.length == 0) {
+      throw new Error("buildConfiguration does not match any available in CMake project.");
+    }
+  } else if (buildConfiguration && configurations[0].name != buildConfiguration) {
+    throw new Error(`buildConfiguration does not match '${configurations[0].name}' configuration used by CMake.`);
+  }
+
+  const codemodelInfo = configurations[0];
   for (const targetInfo of codemodelInfo.targets) {
     const targetDir = path.join(sourceRoot, codemodelInfo.directories[targetInfo.directoryIndex].source);
     if (excludedTargetPaths.some((excludePath) => isSubdirectory(excludePath, targetDir))) {
@@ -6807,6 +6821,8 @@ function findRuleset(rulesetDirectory) {
  * Options to enable/disable different compiler features.
  */
 function CompilerCommandOptions() {
+  // Build configuration to use when using a multi-config CMake generator.
+  this.buildConfiguration = core.getInput("buildConfiguration");
   // Use /external command line options to ignore warnings in CMake SYSTEM headers.
   this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
   // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
@@ -6950,7 +6966,7 @@ function AnalyzeCommand(source, compiler, args, env, sarifLog) {
 async function createAnalysisCommands(buildRoot, options) {
   const replyIndexInfo = await loadCMakeApiReplies(buildRoot);
   const toolchainMap = loadToolchainMap(replyIndexInfo);
-  const compileCommands = loadCompileCommands(replyIndexInfo, options.ignoredTargetPaths);
+  const compileCommands = loadCompileCommands(replyIndexInfo, options.buildConfiguration, options.ignoredTargetPaths);
 
   let commonArgsMap = {};
   let commonEnvMap = {};
