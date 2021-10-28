@@ -62,9 +62,6 @@ jobs:
 
     - name: Configure CMake
       run: cmake ${{ env.sample }}/CMakeLists.txt -B ${{ env.build }} -DCMAKE_BUILD_TYPE=${{ env.config }}
-
-    - name: Build CMake
-      run: cmake --build ${{ env.build }} --config ${{ env.config }}
       
     - name: Run action
       id: run_action

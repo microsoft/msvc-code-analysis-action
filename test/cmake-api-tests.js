@@ -387,14 +387,12 @@ describe("CMakeApi", () => {
             const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
             expect(() => loadCompileCommands(replyIndexInfo, undefined, [])).to.throw(
                 "buildConfiguration is required for multi-config CMake Generators.");
-
         });
 
         it("invalid configuration (multi-config)", async () => {
             const replyIndexInfo = getApiReplyIndex(cmakeApiDir);
             expect(() => loadCompileCommands(replyIndexInfo, "InvalidConfig", [])).to.throw(
                 "buildConfiguration does not match any available in CMake project.");
-
         });
         
         it("invalid configuration (single-config", async () => {
