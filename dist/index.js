@@ -6412,13 +6412,14 @@ function isDirectoryEmpty(targetDir) {
 }
 
 /**
- * Validate if the targetDir is either equal or a sub-directory of the parentDir
- * @param {string} parentDir parent directory
+ * Validate if the targetDir is either equal or a sub-directory of any path in parentDirs
+ * @param {string[]} parentDirs parent directories
  * @param {string} targetDir directory to test
- * @returns {boolean} true if sub-directory
+ * @returns {boolean} true if a sub-directory if found
  */
-function isSubdirectory(parentDir, targetDir) {
-  return path.normalize(targetDir).startsWith(path.normalize(parentDir));
+function containsSubdirectory(parentDirs, targetDir) {
+  const normalizedTarget = path.normalize(targetDir);
+  return parentDirs.some((parentDir) => normalizedTarget.startsWith(path.normalize(parentDir)));
 }
 
 /**
@@ -6746,7 +6747,7 @@ function loadCompileCommands(replyIndexInfo, buildConfiguration, excludedTargetP
   const codemodelInfo = configurations[0];
   for (const targetInfo of codemodelInfo.targets) {
     const targetDir = path.join(sourceRoot, codemodelInfo.directories[targetInfo.directoryIndex].source);
-    if (excludedTargetPaths.some((excludePath) => isSubdirectory(excludePath, targetDir))) {
+    if (containsSubdirectory(excludedTargetPaths, targetDir)) {
       continue;
     }
 
@@ -6827,14 +6828,12 @@ function CompilerCommandOptions() {
   this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
   // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
   this.loadImplicitCompilerEnv = core.getInput("loadImplicitCompilerEnv");
-  // Ignore analysis on any CMake targets defined in these paths
-  this.ignoredTargetPaths = resolveInputPaths("ignoredTargetPaths");
-  // Additional include paths to exclude from analysis
-  this.ignoredIncludePaths = resolveInputPaths("ignoredIncludePaths")
-    .map((include) => new IncludePath(include, true));
-  if (this.ignoredIncludePaths && !this.ignoreSystemHeaders) {
-    throw new Error("Use of 'ignoredIncludePaths' requires 'ignoreSystemHeaders == true'");
-  }
+  // Ignore analysis on any CMake targets ot includes.
+  this.ignoredPaths = resolveInputPaths("ignoredPaths");
+  this.ignoredTargetPaths = this.ignoredPaths || [];
+  this.ignoredTargetPaths = this.ignoredTargetPaths.concat(resolveInputPaths("ignoredTargetPaths"));
+  this.ignoredIncludePaths = this.ignoredPaths || [];
+  this.ignoredIncludePaths = this.ignoredIncludePaths.concat(resolveInputPaths("ignoredIncludePaths"));
   // Additional arguments to add the command-line of every analysis instance
   this.additionalArgs = core.getInput("additionalArgs");
   // TODO: add support to build precompiled headers before running analysis.
@@ -6985,8 +6984,9 @@ async function createAnalysisCommands(buildRoot, options) {
       const allIncludes = toolchain.includes.concat(
         command.includes, options.ignoredIncludePaths);
       for (const include of allIncludes) {
-        if (options.ignoreSystemHeaders && include.isSystem) {
-          // TODO: filter compilers that don't support /external.
+        if ((options.ignoreSystemHeaders && include.isSystem) || 
+            containsSubdirectory(options.ignoredIncludePaths, include.path)) {
+          // TODO: filter compiler versions that don't support /external.
           args.push(`/external:I${include.path}`);
         } else {
           args.push(`/I${include.path}`);

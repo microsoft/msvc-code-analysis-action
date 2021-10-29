@@ -42,19 +42,19 @@ jobs:
           - test: Regular
             outcome: success
             ruleset: NativeRecommendedRules.ruleset
-            ignoredTargetPaths: test/sample/failure
+            ignoredPaths: test/sample/failure
           - test: Custom ruleset
             outcome: success
             ruleset: test/sample/Custom.ruleset
-            ignoredTargetPaths: test/sample/failure
+            ignoredPaths: test/sample/failure
           - test: Invalid ruleset
             outcome: failure
             ruleset: test/sample/Invalid.ruleset
-            ignoredTargetPaths: test/sample/failure
+            ignoredPaths: test/sample/failure
           - test: Compilation Error
             outcome: failure
             ruleset: NativeRecommendedRules.ruleset
-            ignoredTargetPaths: ''
+            ignoredPaths: ''
 
     steps:
     - name: Checkout action
@@ -73,7 +73,7 @@ jobs:
         resultsPath: ${{ env.result }}
         ruleset: ${{ matrix.ruleset }}
         ignoreSystemHeaders: true
-        ignoredTargetPaths: ${{ matrix.ignoredTargetPaths }}
+        ignoredPaths: ${{ matrix.ignoredPaths }}
 
     - name: Validate expected action outcome
       if: steps.run_action.outcome != matrix.outcome
