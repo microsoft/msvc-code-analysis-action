@@ -6415,7 +6415,7 @@ function isDirectoryEmpty(targetDir) {
  * Validate if the targetDir is either equal or a sub-directory of any path in parentDirs
  * @param {string[]} parentDirs parent directories
  * @param {string} targetDir directory to test
- * @returns {boolean} true if a sub-directory if found
+ * @returns {boolean} true if a sub-directory is found
  */
 function containsSubdirectory(parentDirs, targetDir) {
   const normalizedTarget = path.normalize(targetDir);
@@ -6828,7 +6828,7 @@ function CompilerCommandOptions() {
   this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
   // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
   this.loadImplicitCompilerEnv = core.getInput("loadImplicitCompilerEnv");
-  // Ignore analysis on any CMake targets ot includes.
+  // Ignore analysis on any CMake targets or includes.
   this.ignoredPaths = resolveInputPaths("ignoredPaths");
   this.ignoredTargetPaths = this.ignoredPaths || [];
   this.ignoredTargetPaths = this.ignoredTargetPaths.concat(resolveInputPaths("ignoredTargetPaths"));

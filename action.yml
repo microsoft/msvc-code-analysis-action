@@ -17,7 +17,7 @@ inputs:
   ignoredTargetPaths:
     description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful
                   for excluding tests or locally built dependencies. List is ";" seperated, requires complete
-                  directory paths and can be absoluteor relative to "github.workspace"'
+                  directory paths and can be absolute or relative to "github.workspace"'
     required: false
   ignoredIncludePaths:
     description: 'Any includes contained inside these path will be excluded from analysis. This will only filter
