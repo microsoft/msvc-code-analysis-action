@@ -6412,13 +6412,14 @@ function isDirectoryEmpty(targetDir) {
 }
 
 /**
- * Validate if the targetDir is either equal or a sub-directory of the parentDir
- * @param {string} parentDir parent directory
+ * Validate if the targetDir is either equal or a sub-directory of any path in parentDirs
+ * @param {string[]} parentDirs parent directories
  * @param {string} targetDir directory to test
- * @returns {boolean} true if sub-directory
+ * @returns {boolean} true if a sub-directory is found
  */
-function isSubdirectory(parentDir, targetDir) {
-  return path.normalize(targetDir).startsWith(path.normalize(parentDir));
+function containsSubdirectory(parentDirs, targetDir) {
+  const normalizedTarget = path.normalize(targetDir);
+  return parentDirs.some((parentDir) => normalizedTarget.startsWith(path.normalize(parentDir)));
 }
 
 /**
@@ -6746,7 +6747,7 @@ function loadCompileCommands(replyIndexInfo, buildConfiguration, excludedTargetP
   const codemodelInfo = configurations[0];
   for (const targetInfo of codemodelInfo.targets) {
     const targetDir = path.join(sourceRoot, codemodelInfo.directories[targetInfo.directoryIndex].source);
-    if (excludedTargetPaths.some((excludePath) => isSubdirectory(excludePath, targetDir))) {
+    if (containsSubdirectory(excludedTargetPaths, targetDir)) {
       continue;
     }
 
@@ -6827,14 +6828,12 @@ function CompilerCommandOptions() {
   this.ignoreSystemHeaders = core.getInput("ignoreSystemHeaders");
   // Toggle whether implicit includes/libs are loaded from Visual Studio Command Prompt
   this.loadImplicitCompilerEnv = core.getInput("loadImplicitCompilerEnv");
-  // Ignore analysis on any CMake targets defined in these paths
-  this.ignoredTargetPaths = resolveInputPaths("ignoredTargetPaths");
-  // Additional include paths to exclude from analysis
-  this.ignoredIncludePaths = resolveInputPaths("ignoredIncludePaths")
-    .map((include) => new IncludePath(include, true));
-  if (this.ignoredIncludePaths && !this.ignoreSystemHeaders) {
-    throw new Error("Use of 'ignoredIncludePaths' requires 'ignoreSystemHeaders == true'");
-  }
+  // Ignore analysis on any CMake targets or includes.
+  this.ignoredPaths = resolveInputPaths("ignoredPaths");
+  this.ignoredTargetPaths = this.ignoredPaths || [];
+  this.ignoredTargetPaths = this.ignoredTargetPaths.concat(resolveInputPaths("ignoredTargetPaths"));
+  this.ignoredIncludePaths = this.ignoredPaths || [];
+  this.ignoredIncludePaths = this.ignoredIncludePaths.concat(resolveInputPaths("ignoredIncludePaths"));
   // Additional arguments to add the command-line of every analysis instance
   this.additionalArgs = core.getInput("additionalArgs");
   // TODO: add support to build precompiled headers before running analysis.
@@ -6982,11 +6981,11 @@ async function createAnalysisCommands(buildRoot, options) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
       let args = toolrunner.argStringToArray(command.args);
-      const allIncludes = toolchain.includes.concat(
-        command.includes, options.ignoredIncludePaths);
+      const allIncludes = toolchain.includes.concat(command.includes);
       for (const include of allIncludes) {
-        if (options.ignoreSystemHeaders && include.isSystem) {
-          // TODO: filter compilers that don't support /external.
+        if ((options.ignoreSystemHeaders && include.isSystem) || 
+            containsSubdirectory(options.ignoredIncludePaths, include.path)) {
+          // TODO: filter compiler versions that don't support /external.
           args.push(`/external:I${include.path}`);
         } else {
           args.push(`/I${include.path}`);
@@ -7064,28 +7063,30 @@ function ResultCache() {
   };
 };
 
-function filterRun(run, resultCache) {
-  // remove any artifacts that don't contain results to reduce log size
-  run.artifacts = run.artifacts.filter(artifact => artifact.roles &&
-    artifact.roles.some(r => r == "resultFile"));
-
-  // remove any duplicate results from other sarif runs
-  run.results = run.results.filter(result => resultCache.addIfUnique(result));
-
-  return run;
-}
-
 function combineSarif(resultPath, sarifFiles) {
   const resultCache = new ResultCache();
   const combinedSarif = {
     "version": "2.1.0",
     "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.5.json",
-    "runs": []
+    "runs": [{
+      "tool": null,
+      "results": []
+    }]
   };
 
   for (const sarifFile of sarifFiles) {
     const sarifLog = parseReplyFile(sarifFile);
-    combinedSarif.runs.push(filterRun(sarifLog.runs[0], resultCache));
+    for (const run of sarifLog.runs) {
+      if (!combinedSarif.runs[0].tool) {
+        combinedSarif.runs[0].tool = run.tool;
+      }
+
+      for (const result of run.results) {
+        if (resultCache.addIfUnique(result)) {
+          combinedSarif.runs[0].results.push(result);
+        }
+      }
+    }
   }
 
   try {

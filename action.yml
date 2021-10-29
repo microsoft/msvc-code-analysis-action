@@ -11,20 +11,26 @@ inputs:
   ruleset:
     description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'
+  ignoredPaths:
+    description: 'Identical to setting "ignoredTargetPaths" and "ignoreSystemHeaders" for the given path. This
+                  is recommended over either option seperately.'
   ignoredTargetPaths:
-    description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful for excluding
-                  code such as unit tests. List is ";" seperated and can be absolute or relative to "github.workspace"'
+    description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful
+                  for excluding tests or locally built dependencies. List is ";" seperated, requires complete
+                  directory paths and can be absolute or relative to "github.workspace"'
     required: false
   ignoredIncludePaths:
-    description: 'Any paths in this list will be treated as SYSTEM includes and will be excluded from analysis. This requires
-                 "ignoreSystemHeaders == true". List is ";" seperated and can be absolute or relative to "github.workspace"'
+    description: 'Any includes contained inside these path will be excluded from analysis. This will only filter
+                  existing paths add not add any additional includes to the compiler. This is useful for excluding
+                  target includes or other custom includes added to CMake. List is ";" seperated, requires complete
+                  directory paths and can be absolute or relative to "github.workspace"'
     required: false
   ignoreSystemHeaders:
     description: 'Uses /external arguments to ignore warnings from any headers marked as SYSTEM in CMake.'
     default: true
   resultsPath:
-    description: 'Optional path to generate the SARIF file to. If not supplied "results.sarif" will be created in the CMake
-                  build directory. Path can be absolute or relative to "github.workspace".'
+    description: 'Optional path to generate the SARIF file to. If not supplied "results.sarif" will be created in
+                  the CMake build directory. Path can be absolute or relative to "github.workspace".'
     required: false
   loadImplicitCompilerEnv:
     description: 'Load implicit includes/libs for the given MSVC toolset using Visual Studio Command Prompt. Set to
