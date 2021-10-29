@@ -6981,8 +6981,7 @@ async function createAnalysisCommands(buildRoot, options) {
     const toolchain = toolchainMap[command.language];
     if (toolchain) {
       let args = toolrunner.argStringToArray(command.args);
-      const allIncludes = toolchain.includes.concat(
-        command.includes, options.ignoredIncludePaths);
+      const allIncludes = toolchain.includes.concat(command.includes);
       for (const include of allIncludes) {
         if ((options.ignoreSystemHeaders && include.isSystem) || 
             containsSubdirectory(options.ignoredIncludePaths, include.path)) {
