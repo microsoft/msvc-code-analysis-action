@@ -676,28 +676,30 @@ function ResultCache() {
   };
 };
 
-function filterRun(run, resultCache) {
-  // remove any artifacts that don't contain results to reduce log size
-  run.artifacts = run.artifacts.filter(artifact => artifact.roles &&
-    artifact.roles.some(r => r == "resultFile"));
-
-  // remove any duplicate results from other sarif runs
-  run.results = run.results.filter(result => resultCache.addIfUnique(result));
-
-  return run;
-}
-
 function combineSarif(resultPath, sarifFiles) {
   const resultCache = new ResultCache();
   const combinedSarif = {
     "version": "2.1.0",
     "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.5.json",
-    "runs": []
+    "runs": [{
+      "tool": null,
+      "results": []
+    }]
   };
 
   for (const sarifFile of sarifFiles) {
     const sarifLog = parseReplyFile(sarifFile);
-    combinedSarif.runs.push(filterRun(sarifLog.runs[0], resultCache));
+    for (const run of sarifLog.runs) {
+      if (!combinedSarif.runs[0].tool) {
+        combinedSarif.runs[0].tool = run.tool;
+      }
+
+      for (const result of run.results) {
+        if (resultCache.addIfUnique(result)) {
+          combinedSarif.runs[0].results.add(result);
+        }
+      }
+    }
   }
 
   try {
