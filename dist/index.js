@@ -7083,7 +7083,7 @@ function combineSarif(resultPath, sarifFiles) {
 
       for (const result of run.results) {
         if (resultCache.addIfUnique(result)) {
-          combinedSarif.runs[0].results.add(result);
+          combinedSarif.runs[0].results.push(result);
         }
       }
     }
