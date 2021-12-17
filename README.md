@@ -51,8 +51,10 @@ jobs:
           buildConfiguration: ${{ env.config }}
           # Ruleset file that will determine what checks will be run
           ruleset: NativeRecommendedRules.ruleset
-          # Paths to ignore analysis of CMake targets and includes
-          # ignoredPaths: ${{ github.workspace }}/dependencies;${{ github.workspace }}/test
+          # Paths to ignore analysis of CMake targets
+          # ignoredTargetPaths: ${{ github.workspace }}/dependencies;${{ github.workspace }}/test
+          # Paths to ignore analysis of include paths
+          # ignoredIncludePaths: ${{ github.workspace }}/dependencies;${{ github.workspace }}/test
 
       # Upload SARIF file to GitHub Code Scanning Alerts
       - name: Upload SARIF to GitHub
