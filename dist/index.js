@@ -6649,11 +6649,11 @@ function ToolchainInfo(toolchain) {
   const targetDir = path.dirname(this.path);
   const hostDir = path.dirname(targetDir);
   this.targetArch = path.basename(targetDir);
-  switch (path.basename(hostDir)) {
-    case 'Hostx86':
+  switch (path.basename(hostDir).toLowerCase()) {
+    case 'hostx86':
       this.hostArch = 'x86';
       break;
-    case 'Hostx64':
+    case 'hostx64':
       this.hostArch = 'x64';
       break;
     default:
