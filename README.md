@@ -17,7 +17,6 @@ of generated files.
 
 Description of all input parameters: [action.yml](https://github.com/microsoft/msvc-code-analysis-action/blob/main/action.yml)
 
-
 ### Example
 
 ```yml
@@ -43,7 +42,7 @@ jobs:
       #   run: cmake --build ${{ env.build }} --config ${{ env.config }}
 
       - name: Run MSVC Code Analysis
-        uses: microsoft/msvc-code-analysis-action@v0.1.0
+        uses: microsoft/msvc-code-analysis-action@v0.1.1
         # Provide a unique ID to access the sarif output path
         id: run-analysis
         with:
@@ -56,7 +55,7 @@ jobs:
 
       # Upload SARIF file to GitHub Code Scanning Alerts
       - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: ${{ steps.run-analysis.outputs.sarif }}
 
@@ -66,6 +65,42 @@ jobs:
         with:
           name: sarif-file
           path: ${{ steps.run-analysis.outputs.sarif }}
+```
+
+### Warning Configuration
+
+By the default the action will use the set of warnings on by default inside of Visual Studio. However the tool can be
+configured to use any Ruleset either shipped with Visual Studio or user defined. For the best results it is
+recommended to use a custom Ruleset that adds/removes warnings on-top an existing Ruleset. This ensures that the user
+does not miss out on any new warnings are created. Refer to the
+[documentation on Rulesets](https://docs.microsoft.com/cpp/code-quality/using-rule-sets-to-specify-the-cpp-rules-to-run)
+for more information.
+
+#### Example Ruleset
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RuleSet Name="Example" Description="Enable Warnings" ToolsVersion="10.0">
+  <!-- Default rules available in Visual Studio -->
+  <Include Path="NativeRecommendedRules.ruleset" Action="Default" />
+  <Rules AnalyzerId="Microsoft.Analyzers.NativeCodeAnalysis"
+         RuleNamespace="Microsoft.Rules.Native">
+    <Rule Id="C26440" Action="None" /> <!-- Exclude: Declare noexcept -->
+    <Rule Id="C26492" Action="None" /> <!-- Include: No const_cast<> -->
+  </Rules>
+</RuleSet>
+```
+
+#### Suppression
+
+Ruleset are the main form of configuration but for a lightweight approach to suppress warnings you can pass options
+directly to the compiler.
+
+```yml
+  id: run-analysis
+  with:
+    additionalArgs: /wd6001 /wd6011 # Suppress C6001 & C6011
+    # ....
 ```
 
 ## Contributing
