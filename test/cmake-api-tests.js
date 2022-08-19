@@ -266,6 +266,7 @@ describe("CMakeApi", () => {
 
     beforeEach(() => {
         // modules
+        td.replace('@actions/core');
         exec = td.replace('@actions/exec');
         fs = td.replace("fs");
         io = td.replace('@actions/io');
