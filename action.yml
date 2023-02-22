@@ -44,5 +44,5 @@ outputs:
     description: 'The path to the SARIF file that is generated containing all the results.'
 
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
