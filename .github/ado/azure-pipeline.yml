@@ -1,0 +1,16 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - name: Codeql.Enabled
+    value: true
+  - name: Codeql.TSAEnabled
+    value: true
+
+steps:
+- script: echo CodeQL plugin will be auto injected on default branch
+  displayName: 'Running pipeline for static analysis'
+
