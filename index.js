@@ -732,6 +732,8 @@ async function main() {
       throw new Error('No C/C++ files were found in the project that could be analyzed.');
     }
 
+    core.info(`Running analysis on ${analyzeCommands.length} files`)
+
     // TODO: timeouts
     await Promise.all(
       analyzeCommands.map(command => (
@@ -751,7 +753,10 @@ async function main() {
       ))
     );
     
+    core.info("Combining SARIF for all files")
     combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
+
+    core.info("Saving SARIF output");
     core.setOutput("sarif", resultPath);
   } catch (error) {
     if (core.isDebug()) {
