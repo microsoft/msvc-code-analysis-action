@@ -732,37 +732,32 @@ async function main() {
       throw new Error('No C/C++ files were found in the project that could be analyzed.');
     }
 
-    // TODO: parallelism
-    const failedSourceFiles = [];
-    for (const command of analyzeCommands) {
-      const execOptions = {
-        cwd: buildDir,
-        env: command.env,
-      };
-
-      // TODO: timeouts
-      core.info(`Running analysis on: ${command.source}`);
-      try {
-        await exec.exec(`"${command.compiler}"`, command.args, execOptions);
-      } catch (err) {
-        core.debug(`Compilation failed with error: ${err}`);
-        core.debug("Environment:");
-        core.debug(execOptions.env);
-        failedSourceFiles.push(command.source);
-      }
+    // TODO: timeouts
+    let failed = []
+    await Promise.all(
+      analyzeCommands.map(command => (
+        async () => {
+          const execOptions = {
+            cwd: buildDir,
+            env: command.env,
+          }
+          try {
+            await exec.exec(`"${command.compiler}"`, command.args, execOptions);
+          } catch (err) {
+            core.info(`Compilation of ${command.source} failed with error: ${err}`);
+            core.info(`Environment: ${execOptions.env}`);
+            failed.push(command.source);
+          }
+        }
+      ))
+    );
+    
+    if (failed.length > 0) {
+      throw new Error(`Analysis failed due to compiler errors in files: ${failed.map(file => path.basename(file)).join(",")}`);
     }
 
-    if (failedSourceFiles.length > 0) {
-      const fileList = failedSourceFiles
-        .map(file => path.basename(file))
-        .join(",");
-      throw new Error(`Analysis failed due to compiler errors in files: ${fileList}`);
-    }
-
-    const sarifResults = analyzeCommands.map(command => command.sarifLog);
-    combineSarif(resultPath, sarifResults);
+    combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
     core.setOutput("sarif", resultPath);
-
   } catch (error) {
     if (core.isDebug()) {
       core.setFailed(error.stack)
