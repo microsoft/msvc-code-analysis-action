@@ -9350,28 +9350,35 @@ async function main() {
 
     core.info(`Running analysis on ${analyzeCommands.length} files`);
 
+    async function processCommand(cmd) {
+      const execOptions = {
+        cwd: buildDir,
+        env: cmd.env,
+      }
+      try {
+        await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
+      } catch (err) {
+        core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
+        core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
+        throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
+      }
+    }
+
     // TODO: timeouts
+
+    // First file is the pch - If there's no pch, it's going to be a regular file
+    // It has to be compiled separately, as all other files require it [and a "Permission Denioed" error will be raised if they try to access it] 
+    await processCommand(createAnalysisCommands[0])
+    
     // We have to process in chunks, otherwise we'll run into out-of-memory situations
     // generally [I believe] it makes no sense to run more "parallel" jobs than the number of cpu threads
     // TODO: Perhaps use `os.cpus()` to get the cpu thread count?
     const CHUNK_SIZE = 8;
     for (let i = 0; i < analyzeCommands.length; i += CHUNK_SIZE) {
       await Promise.all(
-        analyzeCommands.splice(i, Math.min(i + CHUNK_SIZE, analyzeCommands.length)).map(cmd => (
-           (async () => {
-            const execOptions = {
-              cwd: buildDir,
-              env: cmd.env,
-            }
-            try {
-              await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
-            } catch (err) {
-              core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
-              core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
-              throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
-            }
-          })()
-        ))
+        analyzeCommands
+          .slice(i, Math.min(i + CHUNK_SIZE, analyzeCommands.length))
+          .map(cmd => processCommand(cmd))
       );
     }
     
