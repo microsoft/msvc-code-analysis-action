@@ -745,6 +745,7 @@ async function main() {
           } catch (err) {
             core.info(`Compilation of ${command.source} failed with error: ${err}`);
             core.info(`Environment: ${execOptions.env}`);
+            throw new Error(`Analysis failed due to compile errors in ${command.source}`) // No need to continue the analysis once a file has failed
           }
         }
       ))
