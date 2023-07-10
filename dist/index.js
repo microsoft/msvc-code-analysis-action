@@ -9351,23 +9351,29 @@ async function main() {
     core.info(`Running analysis on ${analyzeCommands.length} files`);
 
     // TODO: timeouts
-    await Promise.all(
-      analyzeCommands.map(cmd => (
-         (async () => {
-          const execOptions = {
-            cwd: buildDir,
-            env: cmd.env,
-          }
-          try {
-            await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
-          } catch (err) {
-            core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
-            core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
-            throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
-          }
-        })()
-      ))
-    );
+    // We have to process in chunks, otherwise we'll run into out-of-memory situations
+    // generally [I believe] it makes no sense to run more "parallel" jobs than the number of cpu threads
+    // TODO: Perhaps use `os.cpus()` to get the cpu thread count?
+    const CHUNK_SIZE = 8;
+    for (let i = 0; i < analyzeCommands.length; i += CHUNK_SIZE) {
+      await Promise.all(
+        analyzeCommands.splice(i, Math.min(i + CHUNK_SIZE, analyzeCommands.length)).map(cmd => (
+           (async () => {
+            const execOptions = {
+              cwd: buildDir,
+              env: cmd.env,
+            }
+            try {
+              await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
+            } catch (err) {
+              core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
+              core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
+              throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
+            }
+          })()
+        ))
+      );
+    }
     
     core.info("Combining sarif for all files");
     combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
