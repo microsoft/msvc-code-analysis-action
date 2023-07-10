@@ -9352,21 +9352,22 @@ async function main() {
 
     // TODO: timeouts
     await Promise.all(
-      analyzeCommands.map(command => (
-        async () => {
+      analyzeCommands.map(cmd => {
+        return async () => {
+          core.info(`Running analysis on ${cmd.source}`)
           const execOptions = {
             cwd: buildDir,
-            env: command.env,
+            env: cmd.env,
           }
           try {
-            await exec.exec(`"${command.compiler}"`, command.args, execOptions);
+            await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
           } catch (err) {
-            core.info(`Compilation of ${command.source} failed with error: ${err}`);
+            core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
             core.info(`Environment: ${execOptions.env}`);
-            throw new Error(`Analysis failed due to compile errors in ${command.source}`) // No need to continue the analysis once a file has failed
+            throw new Error(`Analysis failed due to compile errors in ${cmd.source}`) // No need to continue the analysis once a file has failed
           }
         }
-      ))
+      })
     );
     
     core.info("Combining sarif for all files");
