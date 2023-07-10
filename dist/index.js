@@ -9363,7 +9363,7 @@ async function main() {
           } catch (err) {
             core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
             core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
-            throw new Error(`Analysis failed due to compile errors in ${cmd.source}`)
+            throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
           }
         })()
       ))
