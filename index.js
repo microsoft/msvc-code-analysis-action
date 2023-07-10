@@ -732,37 +732,45 @@ async function main() {
       throw new Error('No C/C++ files were found in the project that could be analyzed.');
     }
 
-    // TODO: parallelism
-    const failedSourceFiles = [];
-    for (const command of analyzeCommands) {
+    core.info(`Running analysis on ${analyzeCommands.length} files`);
+
+    async function processCommand(cmd) {
       const execOptions = {
         cwd: buildDir,
-        env: command.env,
-      };
-
-      // TODO: timeouts
-      core.info(`Running analysis on: ${command.source}`);
+        env: cmd.env,
+      }
       try {
-        await exec.exec(`"${command.compiler}"`, command.args, execOptions);
+        await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
       } catch (err) {
-        core.debug(`Compilation failed with error: ${err}`);
-        core.debug("Environment:");
-        core.debug(execOptions.env);
-        failedSourceFiles.push(command.source);
+        core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
+        core.info(`Environment: ${JSON.stringify(execOptions.env, null, 4)}`);
+        throw new Error(`Analysis failed due to errors in while trying to compile ${cmd.source}`)
       }
     }
 
-    if (failedSourceFiles.length > 0) {
-      const fileList = failedSourceFiles
-        .map(file => path.basename(file))
-        .join(",");
-      throw new Error(`Analysis failed due to compiler errors in files: ${fileList}`);
+    // TODO: timeouts
+
+    // First file is the pch - If there's no pch, it's going to be a regular file
+    // It has to be compiled separately, as all other files require it [and a "Permission Denioed" error will be raised if they try to access it] 
+    await processCommand(analyzeCommands[0])
+    
+    // We have to process in chunks, otherwise we'll run into out-of-memory situations
+    // generally [I believe] it makes no sense to run more "parallel" jobs than the number of cpu threads
+    // TODO: Perhaps use `os.cpus()` to get the cpu thread count?
+    const CHUNK_SIZE = 8;
+    for (let i = 0; i < analyzeCommands.length; i += CHUNK_SIZE) {
+      await Promise.all(
+        analyzeCommands
+          .slice(i, Math.min(i + CHUNK_SIZE, analyzeCommands.length))
+          .map(cmd => processCommand(cmd))
+      );
     }
+    
+    core.info("Combining sarif for all files");
+    combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
 
-    const sarifResults = analyzeCommands.map(command => command.sarifLog);
-    combineSarif(resultPath, sarifResults);
+    core.info("Save SARIF output");
     core.setOutput("sarif", resultPath);
-
   } catch (error) {
     if (core.isDebug()) {
       core.setFailed(error.stack)
@@ -775,6 +783,7 @@ async function main() {
       .forEach(log => fs.unlinkSync(log));
   }
 }
+
 
 if (require.main === module) {
   (async () => {
