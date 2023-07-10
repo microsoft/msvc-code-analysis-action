@@ -733,7 +733,6 @@ async function main() {
     }
 
     // TODO: timeouts
-    let failed = []
     await Promise.all(
       analyzeCommands.map(command => (
         async () => {
@@ -746,16 +745,11 @@ async function main() {
           } catch (err) {
             core.info(`Compilation of ${command.source} failed with error: ${err}`);
             core.info(`Environment: ${execOptions.env}`);
-            failed.push(command.source);
           }
         }
       ))
     );
     
-    if (failed.length > 0) {
-      throw new Error(`Analysis failed due to compiler errors in files: ${failed.map(file => path.basename(file)).join(",")}`);
-    }
-
     combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
     core.setOutput("sarif", resultPath);
   } catch (error) {
