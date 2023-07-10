@@ -9372,7 +9372,7 @@ async function main() {
     core.info("Combining sarif for all files");
     combineSarif(resultPath, analyzeCommands.map(command => command.sarifLog));
 
-    core.info("Saving SARIF output");
+    core.info("Save SARIF output");
     core.setOutput("sarif", resultPath);
   } catch (error) {
     if (core.isDebug()) {
