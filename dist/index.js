@@ -9354,7 +9354,6 @@ async function main() {
     await Promise.all(
       analyzeCommands.map(cmd => (
          (async () => {
-          core.info(`Running analysis on ${cmd.source}`)
           const execOptions = {
             cwd: buildDir,
             env: cmd.env,
@@ -9363,8 +9362,8 @@ async function main() {
             await exec.exec(`"${cmd.compiler}"`, cmd.args, execOptions);
           } catch (err) {
             core.info(`Compilation of ${cmd.source} failed with error: ${err}`);
-            core.info(`Environment: ${execOptions.env}`);
-            throw new Error(`Analysis failed due to compile errors in ${cmd.source}`) // No need to continue the analysis once a file has failed
+            core.info(`Environment: ${JSON.stringify(execOptions.env)}`);
+            throw new Error(`Analysis failed due to compile errors in ${cmd.source}`)
           }
         })()
       ))
