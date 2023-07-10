@@ -9352,8 +9352,8 @@ async function main() {
 
     // TODO: timeouts
     await Promise.all(
-      analyzeCommands.map(cmd => {
-        return async () => {
+      analyzeCommands.map(cmd => (
+         (async () => {
           core.info(`Running analysis on ${cmd.source}`)
           const execOptions = {
             cwd: buildDir,
@@ -9366,8 +9366,8 @@ async function main() {
             core.info(`Environment: ${execOptions.env}`);
             throw new Error(`Analysis failed due to compile errors in ${cmd.source}`) // No need to continue the analysis once a file has failed
           }
-        }
-      })
+        })()
+      ))
     );
     
     core.info("Combining sarif for all files");
