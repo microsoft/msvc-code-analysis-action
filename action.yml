@@ -1,11 +1,11 @@
 name: 'Microsoft C++ Code Analysis Action'
-description: 'Run Microsoft C++ Code Analysis to produce SARIF files for use in github/codeql-action/upload-sarif@v1'
+description: 'Run Microsoft C++ Code Analysis to produce SARIF files for use in github/codeql-action/upload-sarif'
 inputs:
   cmakeBuildDirectory:
     description: 'The CMake build directory that should already be generated.'
     required: true
   buildConfiguration:
-    description: 'The build Configuration (Release, Debug, etc.) to use. This is required if using a
+    description: 'The build Configuration (e.g. Release, Debug) to use. This is required if using a
                   multi-configuration CMake generator.'
     required: false
   ruleset:
