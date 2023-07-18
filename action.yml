@@ -13,16 +13,16 @@ inputs:
     default: 'NativeRecommendedRules.ruleset'
   ignoredPaths:
     description: 'Identical to setting "ignoredTargetPaths" and "ignoreSystemHeaders" for the given path. This
-                  is recommended over either option seperately.'
+                  is recommended over either option separately.'
   ignoredTargetPaths:
     description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful
-                  for excluding tests or locally built dependencies. List is ";" seperated, requires complete
+                  for excluding tests or locally built dependencies. List is ";" separated, requires complete
                   directory paths and can be absolute or relative to "github.workspace"'
     required: false
   ignoredIncludePaths:
     description: 'Any includes contained inside these path will be excluded from analysis. This will only filter
                   existing paths add not add any additional includes to the compiler. This is useful for excluding
-                  target includes or other custom includes added to CMake. List is ";" seperated, requires complete
+                  target includes or other custom includes added to CMake. List is ";" separated, requires complete
                   directory paths and can be absolute or relative to "github.workspace"'
     required: false
   ignoreSystemHeaders:
